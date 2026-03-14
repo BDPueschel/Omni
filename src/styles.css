@@ -17,6 +17,12 @@ html, body, #app {
   border-radius: 12px;
   overflow: hidden;
   margin: 8px;
+  animation: fadeIn 0.1s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .omni-input {
