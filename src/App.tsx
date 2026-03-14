@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "preact/hooks";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { SearchInput } from "./components/SearchInput";
 import { ResultGroup } from "./components/ResultGroup";
 
@@ -125,6 +126,22 @@ export function App() {
     const el = document.querySelector(".result-item.selected");
     el?.scrollIntoView({ block: "nearest" });
   }, [selectedIndex]);
+
+  // Listen for backend events
+  useEffect(() => {
+    const unlistenClear = listen("clear-query", () => {
+      setQuery("");
+      setResults([]);
+      setSelectedIndex(0);
+    });
+    const unlistenShown = listen("window-shown", () => {
+      invoke("refresh_apps");
+    });
+    return () => {
+      unlistenClear.then((fn) => fn());
+      unlistenShown.then((fn) => fn());
+    };
+  }, []);
 
   let globalIndex = 0;
 

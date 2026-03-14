@@ -104,6 +104,13 @@ pub fn execute_action(action: crate::providers::ResultAction) -> Result<(), Stri
     }
 }
 
+#[tauri::command]
+pub fn hide_window(window: tauri::WebviewWindow) {
+    use tauri::Emitter;
+    let _ = window.hide();
+    let _ = window.emit("clear-query", ());
+}
+
 fn execute_system_command(command: &str) -> Result<(), String> {
     match command {
         "lock" => {
