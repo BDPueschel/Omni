@@ -1,3 +1,4 @@
+pub mod apps;
 pub mod math;
 pub mod url;
 pub mod system;
