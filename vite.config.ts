@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [preact()],
   clearScreen: false,
   server: {
+    port: 1420,
     strictPort: true,
   },
   envPrefix: ["VITE_", "TAURI_"],
