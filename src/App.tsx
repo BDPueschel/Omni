@@ -51,10 +51,18 @@ export function App() {
     }, 50);
   }, []);
 
+  const DESTRUCTIVE_COMMANDS = ["shutdown", "restart", "sign_out"];
+
   const executeResult = useCallback(
     async (index: number) => {
       const result = flatResults[index];
       if (!result) return;
+
+      if (result.action.type === "system_command" &&
+          DESTRUCTIVE_COMMANDS.includes(result.action.command)) {
+        const confirmed = window.confirm(`Are you sure you want to ${result.title.toLowerCase()}?`);
+        if (!confirmed) return;
+      }
 
       if (result.action.type === "copy") {
         await navigator.clipboard.writeText(result.action.text);
