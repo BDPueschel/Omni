@@ -1,0 +1,59 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: "Segoe UI", system-ui, sans-serif;
+  background: #1a1a1f;
+  color: #e0e0e0;
+  padding: 24px;
+}
+
+.settings-container h1 {
+  font-size: 20px;
+  margin-bottom: 24px;
+  font-weight: 600;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.setting-row label { font-size: 14px; }
+
+.setting-row input[type="text"],
+.setting-row input[type="number"],
+.setting-row select {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 6px 10px;
+  color: #e0e0e0;
+  font-size: 14px;
+  width: 160px;
+}
+
+.setting-row input[type="range"] { width: 160px; }
+
+.save-button {
+  margin-top: 24px;
+  width: 100%;
+  padding: 10px;
+  background: rgba(100, 140, 255, 0.8);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.save-button:hover { background: rgba(100, 140, 255, 1); }
+
+.settings-loading {
+  text-align: center;
+  padding: 24px;
+  color: rgba(255, 255, 255, 0.3);
+}

@@ -23,6 +23,16 @@
         "center": true,
         "alwaysOnTop": true,
         "skipTaskbar": true
+      },
+      {
+        "label": "settings",
+        "title": "Omni Settings",
+        "width": 450,
+        "height": 400,
+        "resizable": false,
+        "visible": false,
+        "center": true,
+        "url": "settings.html"
       }
     ],
     "security": {
