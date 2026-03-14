@@ -1,3 +1,4 @@
+pub mod autostart;
 pub mod config;
 pub mod providers;
 pub mod search;
@@ -91,6 +92,14 @@ pub fn run() {
                     _ => {}
                 })
                 .build(app)?;
+
+            // Auto-start registration
+            let config = app.state::<AppState>().config.lock().unwrap().clone();
+            if config.start_with_windows && !autostart::is_autostart_enabled() {
+                if let Ok(exe) = std::env::current_exe() {
+                    let _ = autostart::enable_autostart(&exe.to_string_lossy());
+                }
+            }
 
             Ok(())
         })
