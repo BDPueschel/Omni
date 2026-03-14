@@ -1,4 +1,7 @@
 pub mod math;
+pub mod url;
+pub mod system;
+pub mod web_search;
 
 use serde::{Deserialize, Serialize};
 
