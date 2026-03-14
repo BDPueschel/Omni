@@ -58,6 +58,40 @@ pub fn run() {
                 }
             });
 
+            // System tray
+            use tauri::menu::{Menu, MenuItem};
+            use tauri::tray::TrayIconBuilder;
+
+            let show_item = MenuItem::with_id(app, "show", "Show Omni", true, None::<&str>)?;
+            let settings_item = MenuItem::with_id(app, "settings", "Settings", true, None::<&str>)?;
+            let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+
+            let menu = Menu::with_items(app, &[&show_item, &settings_item, &quit_item])?;
+
+            let win_tray = window.clone();
+            TrayIconBuilder::new()
+                .tooltip("Omni — Alt+Space")
+                .icon(app.default_window_icon().unwrap().clone())
+                .menu(&menu)
+                .on_menu_event(move |app, event| match event.id.as_ref() {
+                    "show" => {
+                        let _ = win_tray.center();
+                        let _ = win_tray.show();
+                        let _ = win_tray.set_focus();
+                    }
+                    "settings" => {
+                        if let Some(settings_win) = app.get_webview_window("settings") {
+                            let _ = settings_win.show();
+                            let _ = settings_win.set_focus();
+                        }
+                    }
+                    "quit" => {
+                        app.exit(0);
+                    }
+                    _ => {}
+                })
+                .build(app)?;
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
