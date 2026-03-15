@@ -269,7 +269,7 @@ impl EverythingProvider {
 
     /// Build the Everything search query string, handling path context, regex, and raw operators.
     /// Returns the processed query string for the HTTP API.
-    fn build_http_query(query: &str) -> String {
+    pub fn build_http_query(query: &str) -> String {
         // Regex mode: pass regex: prefix through to Everything
         if let Some(pattern) = Self::parse_regex_prefix(query) {
             return format!("regex:{}", pattern);
@@ -408,6 +408,51 @@ impl EverythingProvider {
                 (files, dirs)
             }
         }
+    }
+
+    /// Public entry point for table panel — returns formatted file/dir results with metadata.
+    pub fn query_http_public(
+        query: &str,
+        max_results: usize,
+        sort: &str,
+        ascending: bool,
+    ) -> Result<Vec<SearchResult>, String> {
+        let response = Self::query_http(query, max_results, sort, ascending)?;
+        let mut results = Vec::new();
+        for r in response.results {
+            let full_path = if r.path.is_empty() {
+                r.name.clone()
+            } else {
+                format!("{}\\{}", r.path, r.name)
+            };
+            let filename = std::path::Path::new(&full_path)
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
+            if r.result_type == "folder" {
+                results.push(SearchResult {
+                    category: "Directories".to_string(),
+                    title: filename,
+                    subtitle: full_path.clone(),
+                    action: ResultAction::OpenFile { path: full_path },
+                    icon: "folder".to_string(),
+                    size: r.size,
+                    date_modified: r.date_modified.map(filetime_to_unix),
+                });
+            } else {
+                results.push(SearchResult {
+                    category: "Files".to_string(),
+                    title: filename,
+                    subtitle: full_path.clone(),
+                    action: ResultAction::OpenFile { path: full_path },
+                    icon: "file".to_string(),
+                    size: r.size,
+                    date_modified: r.date_modified.map(filetime_to_unix),
+                });
+            }
+        }
+        Ok(results)
     }
 
     // ---------------------------------------------------------------

@@ -121,6 +121,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             search::search,
+            search::search_table,
             search::expand_category,
             search::refresh_apps,
             search::open_containing_folder,

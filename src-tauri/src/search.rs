@@ -140,6 +140,50 @@ pub fn search_query(
     all_results
 }
 
+/// Table panel search — files and directories only, with metadata, sortable.
+pub fn search_table_query(
+    query: &str,
+    max: usize,
+    sort_by: &str,
+    ascending: bool,
+) -> Vec<SearchResult> {
+    let query = query.trim();
+    if query.is_empty() {
+        return vec![];
+    }
+
+    // Map frontend sort names to Everything HTTP API sort values.
+    let sort = match sort_by {
+        "name" => "name",
+        "path" => "path",
+        "size" => "size",
+        "date_modified" => "date_modified",
+        _ => "date_modified",
+    };
+
+    let http_query = EverythingProvider::build_http_query(query);
+    match EverythingProvider::query_http_public(&http_query, max, sort, ascending) {
+        Ok(results) => results,
+        Err(e) => {
+            eprintln!("search_table HTTP error: {}", e);
+            // Fallback: use regular search, filter to files/dirs
+            let (files, dirs) = EverythingProvider::search_all(query, max / 2);
+            let mut combined = files;
+            combined.extend(dirs);
+            combined
+        }
+    }
+}
+
+#[tauri::command]
+pub fn search_table(
+    query: &str,
+    sort_by: &str,
+    ascending: bool,
+) -> Vec<SearchResult> {
+    search_table_query(query, 100, sort_by, ascending)
+}
+
 #[tauri::command]
 pub fn search(query: &str, state: State<AppState>) -> Vec<SearchResult> {
     let config = state.config.lock().unwrap().clone();
