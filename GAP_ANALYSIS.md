@@ -4,19 +4,20 @@
 
 | Feature | Everything | Raycast | Omni | Status |
 |---------|-----------|---------|------|--------|
-| Instant file search | Yes | No (Spotlight) | Yes (es.exe) | Done |
+| Instant file search | Yes | No (Spotlight) | Yes (HTTP API) | Done |
 | Fuzzy fragment matching | Yes | Yes | Yes (*foo*bar*) | Done |
 | Path-scoped search | Yes (path:) | No | Yes (C:\path\) | Done |
+| Tab completion | Yes | No | Yes (Tab on paths) | Done |
 | Wildcard patterns | Yes | No | Yes (*.rs) | Done |
 | Regex search | Yes | No | Yes (regex: or r:) | Done |
 | Boolean operators (OR, NOT) | Yes | No | Yes (| and ! passthrough) | Done |
 | File content search | Yes (1.5a) | No | No | Gap |
 | Sort by date/size/name | Yes | N/A | Yes (files by date-modified desc) | Done |
-| File size filter | Yes (size:) | No | Yes (passthrough to es.exe) | Done |
-| Date filters | Yes (dm:today) | No | Yes (passthrough to es.exe) | Done |
+| File size filter | Yes (size:) | No | Yes (passthrough) | Done |
+| Date filters | Yes (dm:today) | No | Yes (passthrough) | Done |
 | Bookmarks/favorites | Yes | Yes | Yes (usage-based Frequent section) | Done |
 | Search history | Yes | Yes | Yes (usage tracking boosts results) | Done |
-| Preview pane | Yes | Yes (Quick Look) | Yes (Ctrl+Space, text/image/binary) | Done |
+| Preview pane | Yes | Yes (Quick Look) | Yes (Ctrl+Space) | Done |
 
 ## App Launching
 
@@ -44,8 +45,8 @@
 | Feature | Everything | Raycast | Omni | Status |
 |---------|-----------|---------|------|--------|
 | System commands | No | Yes | Yes | Done |
-| Kill process | No | Yes | Yes (kill <name>, confirmation) | Done |
-| Clipboard history | No | Yes | No | Gap — major Raycast feature |
+| Kill process | No | Yes | Yes (kill <name>) | Done |
+| Clipboard history | No | Yes | Yes (clip/cb prefix) | Done |
 | Snippet expansion | No | Yes | No | Nice to have |
 | Window management | No | Yes | No | Gap |
 | Emoji picker | No | Yes | No | Nice to have |
@@ -55,14 +56,15 @@
 | Feature | Everything | Raycast | Omni | Status |
 |---------|-----------|---------|------|--------|
 | Open containing folder | Yes | Yes | Yes | Done |
-| Copy path | Yes | Yes | Yes | Done |
+| Copy path | Yes | Yes | Yes (also Ctrl+C) | Done |
 | Open in terminal | No | Yes | Yes (Windows Terminal) | Done |
 | Open in editor | No | Yes | Yes (VS Code) | Done |
 | Run as admin | No | No | Yes | Omni ahead |
-| Open with... | Yes | Yes | Yes (Windows Open As dialog) | Done |
-| Move/Copy file | Yes | No | Yes (folder picker dialogs) | Done |
-| Delete (recycle bin) | Yes | No | Yes (with confirmation) | Done |
-| File properties/metadata | Yes | Yes (Quick Look) | Yes (preview shows size/date) | Done |
+| Open with... | Yes | Yes | Yes | Done |
+| Move/Copy file | Yes | No | Yes (single + batch) | Done |
+| Delete (recycle bin) | Yes | No | Yes (single + batch) | Done |
+| Multi-select batch ops | No | No | Yes (Shift+Arrow) | Omni ahead |
+| File properties/metadata | Yes | Yes | Yes (preview) | Done |
 
 ## UI/UX
 
@@ -70,51 +72,54 @@
 |---------|-----------|---------|------|--------|
 | Global hotkey | No | Yes | Yes (Alt+Space) | Done |
 | Dark theme | Yes | Yes | Yes (Acrylic) | Done |
-| Dynamic window resize | No | Yes | Yes (compact → expands) | Done |
+| Dynamic window resize | No | Yes | Yes | Done |
 | Keyboard-first navigation | Partial | Yes | Yes (full suite) | Done |
-| Category grouping | No (flat) | Yes | Yes | Done |
+| Category grouping | No (flat) | Yes | Yes (with counts) | Done |
 | Expandable categories | No | No | Yes (Ctrl+E toggle) | Omni ahead |
 | Context menu (inline) | Right-click | Yes | Yes (Shift+→) | Done |
 | Help overlay | No | Yes | Yes (Ctrl+H) | Done |
-| App icons (real thumbnails) | Yes | Yes | Yes (Win32 Shell API) | Done |
-| File preview | Yes | Yes (Quick Look) | Yes (Ctrl+Space) | Done |
+| App icons (real) | Yes | Yes | Yes (Win32 Shell API) | Done |
+| File preview | Yes | Yes | Yes (Ctrl+Space) | Done |
+| Status bar | No | Yes | Yes (path + selection count) | Done |
 | Custom app icon | N/A | Yes | Yes (marble glass orb) | Done |
 | Plugin/extension system | No | Yes (store) | No | Gap |
 | Themes/customization | Limited | Yes | Partial (opacity) | Gap |
 
 ## Remaining Gaps
 
-| Feature | Difficulty | Impact | Notes |
-|---------|-----------|--------|-------|
-| Clipboard history | High | High | Raycast's most-used feature, needs background service |
-| Window management | Medium | Medium | Move/resize windows by command |
-| Plugin/extension system | Very High | High | Raycast's ecosystem — major undertaking |
-| File content search | Medium | Medium | Everything 1.5a supports this natively |
-| Emoji picker | Medium | Low | |
-| Timezone display | Low | Low | |
-| Full theme system | Medium | Low | Beyond opacity slider |
+| Feature | Difficulty | Impact |
+|---------|-----------|--------|
+| Window management | Medium | Medium |
+| Plugin/extension system | Very High | High |
+| File content search | Medium | Medium |
+| Emoji picker | Medium | Low |
+| Timezone display | Low | Low |
+| Full theme system | Medium | Low |
 
 ## Where Omni is Ahead of Both
 
-- **Everything-powered search** — faster than Raycast's Spotlight, more integrated than Everything's UI
+- **Everything HTTP API** — single request, sub-50ms response, zero process overhead
 - **Expandable categories** (Ctrl+E toggle) — neither app has this
+- **Multi-select with batch operations** — Shift+Arrow, batch open/copy/move/delete
 - **Path context scoping** — type a path to scope search instantly
+- **Tab completion** on paths — like a terminal
 - **Run as admin** from inline context menu
 - **Directories as a separate category**
 - **Fuzzy fragment search** with Everything's full NTFS index
-- **File preview with keyboard navigation** — scroll, page, jump in preview mode
+- **File preview with keyboard navigation**
 - **Usage-based ranking** — learns your preferences across sessions
 - **Regex search** — prefix with regex: or r:
-- **Full file management** — open with, copy to, move to, delete from context menu
+- **Full file management** — open with, copy to, move to, delete
+- **Status bar** with full path display and selection count
 
 ## Score Summary
 
 | Category | Total Features | Omni Done | Coverage |
 |----------|---------------|-----------|----------|
-| Search & Indexing | 13 | 12 | 92% |
+| Search & Indexing | 14 | 13 | 93% |
 | App Launching | 6 | 5 | 83% |
 | Calculator / Quick Actions | 5 | 4 | 80% |
-| System & Productivity | 6 | 3 | 50% |
-| Context Menu | 9 | 9 | 100% |
-| UI/UX | 13 | 11 | 85% |
-| **Total** | **52** | **44** | **85%** |
+| System & Productivity | 6 | 4 | 67% |
+| Context Menu | 10 | 10 | 100% |
+| UI/UX | 14 | 12 | 86% |
+| **Total** | **55** | **48** | **87%** |
