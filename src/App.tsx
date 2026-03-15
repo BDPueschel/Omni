@@ -414,14 +414,52 @@ export function App() {
             if (e.shiftKey) {
               setTableMultiSelected(prev => new Set([...prev, tableSelectedIndex]));
             }
-            setTableSelectedIndex(i => Math.min(i + 1, tableResults.length - 1));
+            if (e.ctrlKey) {
+              // Jump to last visible row (page-down style)
+              const body = document.querySelector(".table-body") as HTMLElement | null;
+              if (body) {
+                const visibleRows = Math.floor(body.clientHeight / 27); // ~27px per row
+                setTableSelectedIndex(i => Math.min(i + visibleRows, tableResults.length - 1));
+              } else {
+                setTableSelectedIndex(tableResults.length - 1);
+              }
+            } else {
+              setTableSelectedIndex(i => Math.min(i + 1, tableResults.length - 1));
+            }
             return;
           case "ArrowUp":
             e.preventDefault();
             if (e.shiftKey) {
               setTableMultiSelected(prev => new Set([...prev, tableSelectedIndex]));
             }
-            setTableSelectedIndex(i => Math.max(i - 1, 0));
+            if (e.ctrlKey) {
+              // Jump up a page
+              const body = document.querySelector(".table-body") as HTMLElement | null;
+              if (body) {
+                const visibleRows = Math.floor(body.clientHeight / 27);
+                setTableSelectedIndex(i => Math.max(i - visibleRows, 0));
+              } else {
+                setTableSelectedIndex(0);
+              }
+            } else {
+              setTableSelectedIndex(i => Math.max(i - 1, 0));
+            }
+            return;
+          case "PageDown":
+            e.preventDefault();
+            {
+              const body = document.querySelector(".table-body") as HTMLElement | null;
+              const visibleRows = body ? Math.floor(body.clientHeight / 27) : 20;
+              setTableSelectedIndex(i => Math.min(i + visibleRows, tableResults.length - 1));
+            }
+            return;
+          case "PageUp":
+            e.preventDefault();
+            {
+              const body = document.querySelector(".table-body") as HTMLElement | null;
+              const visibleRows = body ? Math.floor(body.clientHeight / 27) : 20;
+              setTableSelectedIndex(i => Math.max(i - visibleRows, 0));
+            }
             return;
           case "Home":
             e.preventDefault();
@@ -476,10 +514,18 @@ export function App() {
             return;
           case "Escape":
             e.preventDefault();
-            if (tableMultiSelected.size > 0) {
+            if (showHelp) {
+              setShowHelp(false);
+            } else if (tableMultiSelected.size > 0) {
               setTableMultiSelected(new Set());
             } else {
               toggleTable();
+            }
+            return;
+          case "h": case "H":
+            if (e.ctrlKey) {
+              e.preventDefault();
+              setShowHelp(v => !v);
             }
             return;
           case "1": case "2": case "3": case "4":
@@ -497,6 +543,13 @@ export function App() {
             if (e.ctrlKey) {
               e.preventDefault();
               toggleTable();
+            }
+            return;
+          case "Tab":
+            if (e.ctrlKey) {
+              e.preventDefault();
+              setActivePanel("results");
+              setTableMultiSelected(new Set());
             }
             return;
           default:
@@ -815,7 +868,7 @@ export function App() {
           const maxH = window.screen.availHeight * 0.85;
           targetHeight = Math.min(500, maxH); // preview gets generous height
         } else if (showHelp) {
-          targetHeight = 420; // search bar + full help overlay
+          targetHeight = 520; // search bar + full help overlay (expanded for all shortcuts)
         } else if (flatResults.length === 0 && !query.trim()) {
           targetHeight = 52; // no frequent items, just search bar
         } else if (flatResults.length === 0) {
