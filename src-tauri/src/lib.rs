@@ -1,6 +1,7 @@
 pub mod autostart;
 pub mod config;
 pub mod icons;
+pub mod preview;
 pub mod providers;
 pub mod search;
 pub mod usage;
@@ -131,6 +132,7 @@ pub fn run() {
             search::get_frequent_items,
             search::clear_usage_data,
             icons::get_icon,
+            preview::preview_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

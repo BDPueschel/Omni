@@ -235,6 +235,66 @@ html, body {
   color: #e0e0e0;
 }
 
+/* Preview panel (Ctrl+Space) */
+.preview-panel {
+  margin: 8px 12px;
+  animation: slideIn 0.1s ease-out;
+}
+
+.preview-header {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.preview-filename {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.preview-meta {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.35);
+  margin-top: 2px;
+}
+
+.preview-content {
+  padding: 8px 12px;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+}
+
+.preview-text {
+  font-family: "Cascadia Code", "Consolas", monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.7);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  margin: 0;
+  tab-size: 4;
+}
+
+.preview-image {
+  max-width: 100%;
+  max-height: 400px;
+  object-fit: contain;
+  border-radius: 4px;
+}
+
+.preview-binary {
+  text-align: center;
+  padding: 40px 20px;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.preview-binary-icon {
+  font-size: 32px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  color: rgba(255, 255, 255, 0.15);
+}
+
 /* Help overlay (Ctrl+H) */
 .help-overlay {
   margin: 8px 12px 12px;

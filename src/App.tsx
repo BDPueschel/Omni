@@ -4,6 +4,8 @@ import { listen } from "@tauri-apps/api/event";
 import { SearchInput } from "./components/SearchInput";
 import { ResultGroup } from "./components/ResultGroup";
 import { ContextMenu, getActions } from "./components/ContextMenu";
+import { PreviewPanel } from "./components/PreviewPanel";
+import type { FilePreview } from "./components/PreviewPanel";
 
 interface SearchResult {
   category: string;
@@ -24,6 +26,7 @@ export function App() {
   const [contextMenuIndex, setContextMenuIndex] = useState<number | null>(null);
   const [contextActionIndex, setContextActionIndex] = useState(0);
   const [showHelp, setShowHelp] = useState(false);
+  const [previewData, setPreviewData] = useState<FilePreview | null>(null);
   const debounceRef = useRef<number | null>(null);
 
   const grouped = CATEGORY_ORDER.map((cat) => ({
@@ -39,6 +42,7 @@ export function App() {
     setExpandedCategory(null);
     setContextMenuIndex(null);
     setContextActionIndex(0);
+    setPreviewData(null);
 
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
@@ -172,6 +176,17 @@ export function App() {
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
+      // Preview is open — Escape closes it
+      if (previewData) {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          setPreviewData(null);
+          return;
+        }
+        // Block other keys while preview is showing (except Escape handled above)
+        return;
+      }
+
       // Context menu is open — handle its navigation
       if (contextMenuIndex !== null) {
         const result = flatResults[contextMenuIndex];
@@ -354,6 +369,17 @@ export function App() {
             setShowHelp((v) => !v);
           }
           break;
+        case " ":
+          if (e.ctrlKey && flatResults.length > 0) {
+            e.preventDefault();
+            const result = flatResults[selectedIndex];
+            if (result && (result.category === "Files" || result.category === "Directories")) {
+              invoke<FilePreview>("preview_file", { path: result.subtitle })
+                .then((preview) => setPreviewData(preview))
+                .catch((err) => console.error("Preview error:", err));
+            }
+          }
+          break;
         case "Escape":
           e.preventDefault();
           if (showHelp) {
@@ -367,7 +393,7 @@ export function App() {
           break;
       }
     },
-    [flatResults, selectedIndex, grouped, executeResult, expandCategory, expandedCategory, query, contextMenuIndex, contextActionIndex, executeContextAction, showHelp]
+    [flatResults, selectedIndex, grouped, executeResult, expandCategory, expandedCategory, query, contextMenuIndex, contextActionIndex, executeContextAction, showHelp, previewData]
   );
 
   // Scroll selected item into view
@@ -385,7 +411,10 @@ export function App() {
         const win = getCurrentWindow();
 
         let targetHeight: number;
-        if (showHelp) {
+        if (previewData) {
+          const maxH = window.screen.availHeight * 0.75;
+          targetHeight = Math.min(500, maxH); // preview gets generous height
+        } else if (showHelp) {
           targetHeight = 420; // search bar + full help overlay
         } else if (flatResults.length === 0 && !query.trim()) {
           targetHeight = 52; // no frequent items, just search bar
@@ -406,7 +435,7 @@ export function App() {
         console.error(`[Omni resize] ERROR:`, e);
       }
     })();
-  }, [flatResults.length, grouped.length, query, showHelp]);
+  }, [flatResults.length, grouped.length, query, showHelp, previewData]);
 
   // Listen for backend events
   useEffect(() => {
@@ -414,6 +443,7 @@ export function App() {
       setQuery("");
       setResults([]);
       setSelectedIndex(0);
+      setPreviewData(null);
     });
     const unlistenShown = listen("window-shown", async () => {
       invoke("refresh_apps");
@@ -438,7 +468,11 @@ export function App() {
   return (
     <div class="omni-container">
       <SearchInput value={query} onInput={handleInput} onKeyDown={handleKeyDown} />
-      {contextMenuIndex !== null && flatResults[contextMenuIndex] ? (
+      {previewData ? (
+        <div class="results-container">
+          <PreviewPanel preview={previewData} />
+        </div>
+      ) : contextMenuIndex !== null && flatResults[contextMenuIndex] ? (
         <div class="results-container">
           <ContextMenu
             result={flatResults[contextMenuIndex]}
@@ -489,6 +523,7 @@ export function App() {
               <div class="help-row"><kbd>Shift+→</kbd><span>Context menu</span></div>
               <div class="help-row"><kbd>Shift+←</kbd><span>Close context menu</span></div>
               <div class="help-row"><kbd>Ctrl+E</kbd><span>Expand category (50 results)</span></div>
+              <div class="help-row"><kbd>Ctrl+Space</kbd><span>Preview file</span></div>
               <div class="help-row"><kbd>Escape</kbd><span>Collapse / hide</span></div>
               <div class="help-row"><kbd>Ctrl+H</kbd><span>Toggle this help</span></div>
             </div>
