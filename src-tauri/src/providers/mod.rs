@@ -18,6 +18,10 @@ pub struct SearchResult {
     pub subtitle: String,
     pub action: ResultAction,
     pub icon: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub size: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub date_modified: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

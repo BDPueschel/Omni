@@ -21,6 +21,8 @@ impl UrlProvider {
             subtitle: "Open in default browser".to_string(),
             action: ResultAction::OpenUrl { url },
             icon: "globe".to_string(),
+            size: None,
+            date_modified: None,
         }]
     }
 }

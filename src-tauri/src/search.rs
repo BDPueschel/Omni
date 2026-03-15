@@ -54,6 +54,8 @@ pub fn search_query(
                     text: entry.content,
                 },
                 icon: "clipboard".to_string(),
+                size: None,
+                date_modified: None,
             });
         }
         return all_results;
@@ -193,6 +195,8 @@ pub fn expand_category(query: &str, category: &str, state: State<AppState>) -> V
                         subtitle: format!("{}{}", pin_prefix, entry.timestamp),
                         action: ResultAction::Copy { text: entry.content },
                         icon: "clipboard".to_string(),
+                        size: None,
+                        date_modified: None,
                     }
                 })
                 .collect()
@@ -439,6 +443,8 @@ pub fn get_frequent_items() -> Vec<SearchResult> {
                 } else {
                     "file".to_string()
                 },
+                size: None,
+                date_modified: None,
             }
         })
         .collect()

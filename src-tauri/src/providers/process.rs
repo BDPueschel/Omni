@@ -201,6 +201,8 @@ impl ProcessProvider {
                         name: name.clone(),
                     },
                     icon: "process".to_string(),
+                    size: None,
+                    date_modified: None,
                 }
             })
             .collect();

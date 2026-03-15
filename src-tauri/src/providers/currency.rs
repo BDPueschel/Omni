@@ -203,6 +203,8 @@ impl CurrencyProvider {
                         text: "Currency rates unavailable".to_string(),
                     },
                     icon: "currency".to_string(),
+                    size: None,
+                    date_modified: None,
                 }];
             }
         };
@@ -228,6 +230,8 @@ impl CurrencyProvider {
             subtitle,
             action: ResultAction::Copy { text: formatted },
             icon: "currency".to_string(),
+            size: None,
+            date_modified: None,
         }]
     }
 }

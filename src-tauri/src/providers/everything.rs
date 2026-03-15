@@ -324,6 +324,8 @@ impl EverythingProvider {
                 url: "https://www.voidtools.com/downloads/".to_string(),
             },
             icon: "alert".to_string(),
+            size: None,
+            date_modified: None,
         }]
     }
 
@@ -361,6 +363,8 @@ impl EverythingProvider {
                                 path: full_path,
                             },
                             icon: "folder".to_string(),
+                            size: None,
+                            date_modified: None,
                         });
                     } else if r.result_type == "file" && files.len() < max_per_type {
                         let filename = Path::new(&full_path)
@@ -376,6 +380,8 @@ impl EverythingProvider {
                                 path: full_path,
                             },
                             icon: "file".to_string(),
+                            size: None,
+                            date_modified: None,
                         });
                     }
                 }
@@ -465,6 +471,8 @@ impl EverythingProvider {
                             subtitle: full_path.clone(),
                             action: ResultAction::LaunchApp { path: full_path },
                             icon: "app".to_string(),
+                            size: None,
+                            date_modified: None,
                         });
                     }
                     if results.len() >= max_results {
@@ -601,6 +609,8 @@ impl EverythingProvider {
                     subtitle: full_path.clone(),
                     action: ResultAction::OpenFile { path: full_path },
                     icon: "file".to_string(),
+                    size: None,
+                    date_modified: None,
                 }
             })
             .collect()
@@ -626,6 +636,8 @@ impl EverythingProvider {
                     subtitle: full_path.clone(),
                     action: ResultAction::OpenFile { path: full_path },
                     icon: "folder".to_string(),
+                    size: None,
+                    date_modified: None,
                 }
             })
             .collect()
@@ -646,6 +658,8 @@ impl EverythingProvider {
                     subtitle: path.clone(),
                     action: ResultAction::OpenFile { path },
                     icon: "file".to_string(),
+                    size: None,
+                    date_modified: None,
                 }
             })
             .collect()
@@ -666,6 +680,8 @@ impl EverythingProvider {
                     subtitle: path.clone(),
                     action: ResultAction::LaunchApp { path },
                     icon: "app".to_string(),
+                    size: None,
+                    date_modified: None,
                 }
             })
             .collect()
@@ -686,6 +702,8 @@ impl EverythingProvider {
                     subtitle: path.clone(),
                     action: ResultAction::OpenFile { path },
                     icon: "folder".to_string(),
+                    size: None,
+                    date_modified: None,
                 }
             })
             .collect()

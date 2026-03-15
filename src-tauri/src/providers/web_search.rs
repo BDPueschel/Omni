@@ -16,6 +16,8 @@ impl WebSearchProvider {
             subtitle: "Open in browser".to_string(),
             action: ResultAction::WebSearch { url: format!("https://www.google.com/search?q={}", encoded) },
             icon: "search".to_string(),
+            size: None,
+            date_modified: None,
         };
         let duckduckgo = SearchResult {
             category: "Web".to_string(),
@@ -23,6 +25,8 @@ impl WebSearchProvider {
             subtitle: "Open in browser".to_string(),
             action: ResultAction::WebSearch { url: format!("https://duckduckgo.com/?q={}", encoded) },
             icon: "search".to_string(),
+            size: None,
+            date_modified: None,
         };
         if preferred_engine == "duckduckgo" {
             vec![duckduckgo, google]

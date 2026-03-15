@@ -32,6 +32,8 @@ impl SystemProvider {
                 subtitle: "System command".to_string(),
                 action: ResultAction::SystemCommand { command: cmd.command.to_string() },
                 icon: cmd.icon.to_string(),
+                size: None,
+                date_modified: None,
             })
             .collect()
     }
