@@ -46,7 +46,7 @@ html, body, #app {
 .search-input-wrapper {
   display: flex;
   align-items: center;
-  padding: 4px 8px;
+  padding: 8px 8px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
@@ -110,6 +110,7 @@ html, body, #app {
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.06);
   font-family: "Segoe UI", system-ui, monospace;
+  margin-right: 10px;
 }
 
 .result-text {

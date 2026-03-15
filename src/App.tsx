@@ -145,14 +145,19 @@ export function App() {
 
         let targetHeight: number;
         if (flatResults.length === 0 && !query.trim()) {
-          targetHeight = 62;
+          targetHeight = 72;
         } else if (flatResults.length === 0) {
-          targetHeight = 120;
+          targetHeight = 130;
         } else {
-          const numGroups = grouped.length;
-          const numResults = flatResults.length;
-          targetHeight = 54 + 16 + (numGroups * 36) + (numResults * 42) + 8;
-          targetHeight = Math.min(targetHeight, 700);
+          // search bar(~58) + container margin(16) + container border(2) + results padding(16)
+          // + per group: header(28) + border(2) + margin(8)
+          // + per result: row height(44)
+          // + bottom breathing room(16)
+          const base = 58 + 16 + 2 + 16 + 16;
+          const groupCost = grouped.length * 38;
+          const resultCost = flatResults.length * 44;
+          targetHeight = base + groupCost + resultCost;
+          targetHeight = Math.min(targetHeight, 800);
         }
 
         console.log(`[Omni resize] results=${flatResults.length} groups=${grouped.length} target=${targetHeight}px`);
