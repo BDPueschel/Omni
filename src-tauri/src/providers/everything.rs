@@ -13,9 +13,32 @@ pub enum EverythingStatus {
     NotRunning,
 }
 
+// --- HTTP API response types ---
+
+#[derive(Debug, serde::Deserialize)]
+struct EverythingHttpResult {
+    #[serde(rename = "type")]
+    result_type: String,
+    name: String,
+    #[serde(default)]
+    path: String,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct EverythingResponse {
+    #[serde(rename = "totalResults")]
+    #[allow(dead_code)]
+    total_results: u64,
+    results: Vec<EverythingHttpResult>,
+}
+
 pub struct EverythingProvider;
 
 impl EverythingProvider {
+    // ---------------------------------------------------------------
+    // es.exe discovery & execution (kept for fallback + tab completion)
+    // ---------------------------------------------------------------
+
     fn find_es_exe() -> &'static Option<String> {
         ES_EXE_PATH.get_or_init(|| {
             // Check next to our own executable and parent dirs
@@ -71,6 +94,74 @@ impl EverythingProvider {
             .collect())
     }
 
+    // ---------------------------------------------------------------
+    // HTTP API
+    // ---------------------------------------------------------------
+
+    fn query_http(
+        query: &str,
+        max_results: usize,
+        sort: &str,
+        ascending: bool,
+    ) -> Result<EverythingResponse, String> {
+        use std::io::{Read, Write};
+        use std::net::TcpStream;
+
+        let encoded_query = {
+            use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
+            utf8_percent_encode(query, NON_ALPHANUMERIC).to_string()
+        };
+
+        let url = format!(
+            "/?s={}&c={}&j=1&path_column=1&sort={}&ascending={}",
+            encoded_query,
+            max_results,
+            sort,
+            if ascending { 1 } else { 0 }
+        );
+
+        let mut stream = TcpStream::connect("127.0.0.1:8080")
+            .map_err(|e| format!("Everything HTTP: {}", e))?;
+        stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+            .ok();
+
+        let request = format!(
+            "GET {} HTTP/1.0\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+            url
+        );
+        stream
+            .write_all(request.as_bytes())
+            .map_err(|e| e.to_string())?;
+
+        let mut response = String::new();
+        stream
+            .read_to_string(&mut response)
+            .map_err(|e| e.to_string())?;
+
+        // Split headers from body
+        let body = response
+            .split("\r\n\r\n")
+            .nth(1)
+            .ok_or("Invalid HTTP response")?;
+
+        // Parse JSON
+        let parsed: EverythingResponse =
+            serde_json::from_str(body).map_err(|e| format!("JSON parse error: {}", e))?;
+
+        Ok(parsed)
+    }
+
+    /// Check if the HTTP API is reachable (used for status checks).
+    fn http_is_available() -> bool {
+        use std::net::TcpStream;
+        TcpStream::connect("127.0.0.1:8080").is_ok()
+    }
+
+    // ---------------------------------------------------------------
+    // Query helpers (unchanged)
+    // ---------------------------------------------------------------
+
     pub fn check_status_at_path(path: &str) -> EverythingStatus {
         if !Path::new(path).exists() {
             return EverythingStatus::NotInstalled;
@@ -79,6 +170,11 @@ impl EverythingProvider {
     }
 
     pub fn check_status() -> EverythingStatus {
+        // Try HTTP first — it's faster and doesn't need es.exe
+        if Self::http_is_available() {
+            return EverythingStatus::Ready;
+        }
+        // Fall back to es.exe check
         if Self::find_es_exe().is_none() {
             return EverythingStatus::NotInstalled;
         }
@@ -157,6 +253,30 @@ impl EverythingProvider {
         }
     }
 
+    /// Build the Everything search query string, handling path context, regex, and raw operators.
+    /// Returns the processed query string for the HTTP API.
+    fn build_http_query(query: &str) -> String {
+        // Regex mode: pass regex: prefix through to Everything
+        if let Some(pattern) = Self::parse_regex_prefix(query) {
+            return format!("regex:{}", pattern);
+        }
+
+        if let Some((path, remainder)) = Self::parse_path_context(query) {
+            let search_part = if remainder.is_empty() {
+                "*".to_string()
+            } else if Self::is_raw_query(&remainder) {
+                remainder
+            } else {
+                Self::wildcardify(&remainder)
+            };
+            format!("\"{}\" {}", path, search_part)
+        } else if Self::is_raw_query(query) {
+            query.trim().to_string()
+        } else {
+            Self::wildcardify(query)
+        }
+    }
+
     /// Build es.exe args for a query, handling path context, regex, and raw operators.
     fn build_search_args(query: &str, max_results: usize, extra_flags: &[&str]) -> Vec<String> {
         let max_str = max_results.to_string();
@@ -198,7 +318,8 @@ impl EverythingProvider {
         vec![SearchResult {
             category: "Files".to_string(),
             title: "Everything search not available".to_string(),
-            subtitle: "es.exe not found — reinstall Omni or Everything".to_string(),
+            subtitle: "es.exe not found and HTTP API unreachable — install Everything"
+                .to_string(),
             action: ResultAction::OpenUrl {
                 url: "https://www.voidtools.com/downloads/".to_string(),
             },
@@ -206,13 +327,170 @@ impl EverythingProvider {
         }]
     }
 
+    // ---------------------------------------------------------------
+    // Combined HTTP search with es.exe fallback
+    // ---------------------------------------------------------------
+
+    /// Search files and directories in a single HTTP request, splitting by type.
+    /// Falls back to es.exe if HTTP is unavailable.
+    pub fn search_all(query: &str, max_per_type: usize) -> (Vec<SearchResult>, Vec<SearchResult>) {
+        let http_query = Self::build_http_query(query);
+
+        // Try HTTP first — single request for both files and dirs
+        match Self::query_http(&http_query, max_per_type * 2, "date_modified", false) {
+            Ok(response) => {
+                let mut files = Vec::new();
+                let mut dirs = Vec::new();
+                for r in response.results {
+                    let full_path = if r.path.is_empty() {
+                        r.name.clone()
+                    } else {
+                        format!("{}\\{}", r.path, r.name)
+                    };
+                    if r.result_type == "folder" && dirs.len() < max_per_type {
+                        let dirname = Path::new(&full_path)
+                            .file_name()
+                            .unwrap_or_default()
+                            .to_string_lossy()
+                            .to_string();
+                        dirs.push(SearchResult {
+                            category: "Directories".to_string(),
+                            title: dirname,
+                            subtitle: full_path.clone(),
+                            action: ResultAction::OpenFile {
+                                path: full_path,
+                            },
+                            icon: "folder".to_string(),
+                        });
+                    } else if r.result_type == "file" && files.len() < max_per_type {
+                        let filename = Path::new(&full_path)
+                            .file_name()
+                            .unwrap_or_default()
+                            .to_string_lossy()
+                            .to_string();
+                        files.push(SearchResult {
+                            category: "Files".to_string(),
+                            title: filename,
+                            subtitle: full_path.clone(),
+                            action: ResultAction::OpenFile {
+                                path: full_path,
+                            },
+                            icon: "file".to_string(),
+                        });
+                    }
+                }
+                (files, dirs)
+            }
+            Err(e) => {
+                eprintln!("Everything HTTP failed, falling back to es.exe: {}", e);
+                let files = Self::search_files_es(query, max_per_type);
+                let dirs = Self::search_dirs_es(query, max_per_type);
+                (files, dirs)
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // Public search methods (HTTP primary, es.exe fallback)
+    // ---------------------------------------------------------------
+
     /// Search for files only (no directories).
     pub fn search_files(query: &str, max_results: usize) -> Vec<SearchResult> {
+        let http_query = format!("file: {}", Self::build_http_query(query));
+        match Self::query_http(&http_query, max_results, "date_modified", false) {
+            Ok(response) => Self::format_http_file_results(response.results),
+            Err(e) => {
+                eprintln!("Everything HTTP failed for files, falling back to es.exe: {}", e);
+                Self::search_files_es(query, max_results)
+            }
+        }
+    }
+
+    /// Search for directories only.
+    pub fn search_dirs(query: &str, max_results: usize) -> Vec<SearchResult> {
+        let http_query = format!("folder: {}", Self::build_http_query(query));
+        match Self::query_http(&http_query, max_results, "date_modified", false) {
+            Ok(response) => Self::format_http_dir_results(response.results),
+            Err(e) => {
+                eprintln!("Everything HTTP failed for dirs, falling back to es.exe: {}", e);
+                Self::search_dirs_es(query, max_results)
+            }
+        }
+    }
+
+    /// General search (files and dirs) — used by tests and expand.
+    pub fn search(query: &str, max_results: usize) -> Vec<SearchResult> {
+        let http_query = Self::build_http_query(query);
+        match Self::query_http(&http_query, max_results, "date_modified", false) {
+            Ok(response) => Self::format_http_file_results(response.results),
+            Err(e) => {
+                eprintln!("Everything HTTP failed for search, falling back to es.exe: {}", e);
+                Self::search_es(query, max_results)
+            }
+        }
+    }
+
+    /// Search for applications (.lnk in Start Menu, .exe in Program Files).
+    pub fn search_apps(query: &str, max_results: usize) -> Vec<SearchResult> {
+        let wildcard = Self::wildcardify(query);
+
+        // Try HTTP: search for .lnk and .exe in relevant paths
+        let http_query = format!(
+            "{}.lnk | {}.exe \"C:\\ProgramData\\Microsoft\\Windows\\Start Menu\" | \"C:\\Users\\Brian\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\" | \"C:\\Program Files\" | \"C:\\Program Files (x86)\"",
+            wildcard, wildcard
+        );
+        match Self::query_http(&http_query, max_results * 2, "date_modified", false) {
+            Ok(response) => {
+                let mut results = Vec::new();
+                let mut seen = std::collections::HashSet::new();
+                for r in response.results {
+                    let full_path = if r.path.is_empty() {
+                        r.name.clone()
+                    } else {
+                        format!("{}\\{}", r.path, r.name)
+                    };
+                    let stem = Path::new(&full_path)
+                        .file_stem()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .to_lowercase();
+                    if seen.insert(stem.clone()) {
+                        results.push(SearchResult {
+                            category: "Apps".to_string(),
+                            title: Path::new(&full_path)
+                                .file_stem()
+                                .unwrap_or_default()
+                                .to_string_lossy()
+                                .to_string(),
+                            subtitle: full_path.clone(),
+                            action: ResultAction::LaunchApp { path: full_path },
+                            icon: "app".to_string(),
+                        });
+                    }
+                    if results.len() >= max_results {
+                        break;
+                    }
+                }
+                results
+            }
+            Err(e) => {
+                eprintln!("Everything HTTP failed for apps, falling back to es.exe: {}", e);
+                Self::search_apps_es(query, max_results)
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // es.exe fallback methods
+    // ---------------------------------------------------------------
+
+    fn search_files_es(query: &str, max_results: usize) -> Vec<SearchResult> {
         if Self::find_es_exe().is_none() {
             return Self::unavailable_result();
         }
 
-        let args = Self::build_search_args(query, max_results, &["-a-d", "-sort-date-modified-descending"]);
+        let args =
+            Self::build_search_args(query, max_results, &["-a-d", "-sort-date-modified-descending"]);
         let arg_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
         match Self::run_es(&arg_refs) {
             Ok(paths) => Self::format_file_results(paths),
@@ -223,8 +501,7 @@ impl EverythingProvider {
         }
     }
 
-    /// Search for directories only.
-    pub fn search_dirs(query: &str, max_results: usize) -> Vec<SearchResult> {
+    fn search_dirs_es(query: &str, max_results: usize) -> Vec<SearchResult> {
         if Self::find_es_exe().is_none() {
             return vec![];
         }
@@ -240,8 +517,7 @@ impl EverythingProvider {
         }
     }
 
-    /// General search (files and dirs) — used by tests and expand.
-    pub fn search(query: &str, max_results: usize) -> Vec<SearchResult> {
+    fn search_es(query: &str, max_results: usize) -> Vec<SearchResult> {
         if Self::find_es_exe().is_none() {
             return Self::unavailable_result();
         }
@@ -256,8 +532,7 @@ impl EverythingProvider {
         }
     }
 
-    /// Search for applications (.lnk in Start Menu, .exe in Program Files).
-    pub fn search_apps(query: &str, max_results: usize) -> Vec<SearchResult> {
+    fn search_apps_es(query: &str, max_results: usize) -> Vec<SearchResult> {
         if Self::find_es_exe().is_none() {
             return vec![];
         }
@@ -280,10 +555,7 @@ impl EverythingProvider {
         // Also search for .exe in Program Files if we have few results
         if all_paths.len() < max_results {
             let exe_query = format!("{}.exe", wildcard);
-            for prog_dir in &[
-                "C:\\Program Files",
-                "C:\\Program Files (x86)",
-            ] {
+            for prog_dir in &["C:\\Program Files", "C:\\Program Files (x86)"] {
                 if let Ok(paths) = Self::run_es(&["-n", "3", &exe_query, "-path", prog_dir]) {
                     all_paths.extend(paths);
                 }
@@ -303,6 +575,60 @@ impl EverythingProvider {
 
         all_paths.truncate(max_results);
         Self::format_app_results(all_paths)
+    }
+
+    // ---------------------------------------------------------------
+    // Result formatting
+    // ---------------------------------------------------------------
+
+    fn format_http_file_results(results: Vec<EverythingHttpResult>) -> Vec<SearchResult> {
+        results
+            .into_iter()
+            .map(|r| {
+                let full_path = if r.path.is_empty() {
+                    r.name.clone()
+                } else {
+                    format!("{}\\{}", r.path, r.name)
+                };
+                let filename = Path::new(&full_path)
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string();
+                SearchResult {
+                    category: "Files".to_string(),
+                    title: filename,
+                    subtitle: full_path.clone(),
+                    action: ResultAction::OpenFile { path: full_path },
+                    icon: "file".to_string(),
+                }
+            })
+            .collect()
+    }
+
+    fn format_http_dir_results(results: Vec<EverythingHttpResult>) -> Vec<SearchResult> {
+        results
+            .into_iter()
+            .map(|r| {
+                let full_path = if r.path.is_empty() {
+                    r.name.clone()
+                } else {
+                    format!("{}\\{}", r.path, r.name)
+                };
+                let dirname = Path::new(&full_path)
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string();
+                SearchResult {
+                    category: "Directories".to_string(),
+                    title: dirname,
+                    subtitle: full_path.clone(),
+                    action: ResultAction::OpenFile { path: full_path },
+                    icon: "folder".to_string(),
+                }
+            })
+            .collect()
     }
 
     fn format_file_results(paths: Vec<String>) -> Vec<SearchResult> {
@@ -367,14 +693,32 @@ impl EverythingProvider {
 
     /// Complete a partial path to matching directories (for Tab completion).
     pub fn complete_path(partial: &str, max: usize) -> Vec<String> {
+        // Try HTTP first
+        let query = format!("folder: {}*", partial);
+        if let Ok(response) = Self::query_http(&query, max, "name", true) {
+            let paths: Vec<String> = response
+                .results
+                .into_iter()
+                .map(|r| {
+                    if r.path.is_empty() {
+                        r.name
+                    } else {
+                        format!("{}\\{}", r.path, r.name)
+                    }
+                })
+                .collect();
+            if !paths.is_empty() {
+                return paths;
+            }
+        }
+
+        // Fall back to es.exe
         if Self::find_es_exe().is_none() {
             return vec![];
         }
-
-        // Search for directories matching the partial path
-        let query = format!("{}*", partial);
+        let es_query = format!("{}*", partial);
         let max_str = max.to_string();
-        match Self::run_es(&["-n", &max_str, "-ad", &query]) {
+        match Self::run_es(&["-n", &max_str, "-ad", &es_query]) {
             Ok(paths) => paths,
             Err(_) => vec![],
         }

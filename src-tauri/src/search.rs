@@ -106,11 +106,10 @@ pub fn search_query(
         all_results.extend(process_results.into_iter().take(max));
     }
 
-    // Everything file search (files only, no directories)
-    all_results.extend(EverythingProvider::search_files(query, max));
-
-    // Everything directory search
-    all_results.extend(EverythingProvider::search_dirs(query, max));
+    // Everything file + directory search (single HTTP request, es.exe fallback)
+    let (files, dirs) = EverythingProvider::search_all(query, max);
+    all_results.extend(files);
+    all_results.extend(dirs);
 
     // Web search fallback (suppress if we have a precise match)
     if !has_math && !has_url && !has_units && !has_currency && !has_color {
