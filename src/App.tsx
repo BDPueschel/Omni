@@ -1071,6 +1071,7 @@ export function App() {
               <div class="help-row"><kbd>Ctrl+Space</kbd><span>Preview file (↑↓ scroll, PgUp/Dn page)</span></div>
               <div class="help-row"><kbd>Escape</kbd><span>Collapse / hide</span></div>
               <div class="help-row"><kbd>Ctrl+T</kbd><span>Table view (file columns)</span></div>
+              <div class="help-row"><kbd>Ctrl+1-4</kbd><span>Sort table by column</span></div>
               <div class="help-row"><kbd>Ctrl+H</kbd><span>Toggle this help</span></div>
             </div>
           </div>
