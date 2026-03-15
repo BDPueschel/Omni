@@ -7,7 +7,7 @@ import { ContextMenu, getActions } from "./components/ContextMenu";
 import { PreviewPanel } from "./components/PreviewPanel";
 import type { FilePreview } from "./components/PreviewPanel";
 import { TablePanel } from "./components/TablePanel";
-import type { TableResult } from "./components/TablePanel";
+import type { TableResult, SortColumn } from "./components/TablePanel";
 
 interface SearchResult {
   category: string;
@@ -66,6 +66,8 @@ export function App() {
   const [tableSelectedIndex, setTableSelectedIndex] = useState(0);
   const [tableResults, setTableResults] = useState<TableResult[]>([]);
   const [tableMultiSelected, setTableMultiSelected] = useState<Set<number>>(new Set());
+  const [tableSortColumn, setTableSortColumn] = useState<SortColumn>("date_modified");
+  const [tableSortAscending, setTableSortAscending] = useState(false);
   const [originalWindowPos, setOriginalWindowPos] = useState<{ x: number; y: number } | null>(null);
   const debounceRef = useRef<number | null>(null);
 
@@ -483,9 +485,12 @@ export function App() {
           case "1": case "2": case "3": case "4":
             if (e.ctrlKey) {
               e.preventDefault();
-              const cols: Array<"name" | "path" | "size" | "date_modified"> = ["name", "path", "size", "date_modified"];
+              const cols: Array<SortColumn> = ["name", "path", "size", "date_modified"];
               const col = cols[parseInt(e.key) - 1];
-              fetchTableResults(query, col, col === "name" || col === "path");
+              const asc = col === "name" || col === "path";
+              setTableSortColumn(col);
+              setTableSortAscending(asc);
+              fetchTableResults(query, col, asc);
             }
             return;
           default:
@@ -774,6 +779,22 @@ export function App() {
     }
   }, [selectedIndex]);
 
+  // Scroll selected table row into view
+  useEffect(() => {
+    if (!tableOpen) return;
+    const el = document.querySelector(".table-row.selected") as HTMLElement | null;
+    const container = document.querySelector(".table-body") as HTMLElement | null;
+    if (!el || !container) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    if (elRect.top < containerRect.top) {
+      container.scrollTop -= (containerRect.top - elRect.top + 4);
+    } else if (elRect.bottom > containerRect.bottom) {
+      container.scrollTop += (elRect.bottom - containerRect.bottom + 4);
+    }
+  }, [tableSelectedIndex, tableOpen]);
+
   // Resize window — anchor top position, only grow downward
   useEffect(() => {
     (async () => {
@@ -887,7 +908,9 @@ export function App() {
                     invoke("record_selection", { query, resultPath: tr.subtitle, category: tr.category, title: tr.title });
                   }
                 }}
-                onSortChange={(col, asc) => fetchTableResults(query, col, asc)}
+                sortColumn={tableSortColumn}
+                sortAscending={tableSortAscending}
+                onSortChange={(col, asc) => { setTableSortColumn(col); setTableSortAscending(asc); fetchTableResults(query, col, asc); }}
               />
             )}
           </div>

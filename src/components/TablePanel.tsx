@@ -1,5 +1,3 @@
-import { useState } from "preact/hooks";
-
 interface TableResult {
   category: string;
   title: string;
@@ -10,29 +8,24 @@ interface TableResult {
   date_modified?: number;
 }
 
+type SortColumn = "name" | "path" | "size" | "date_modified";
+
 interface Props {
   results: TableResult[];
   selectedIndex: number;
   multiSelected: Set<number>;
+  sortColumn: SortColumn;
+  sortAscending: boolean;
   onSelect: (index: number) => void;
   onExecute: (index: number) => void;
-  onSortChange: (column: string, ascending: boolean) => void;
+  onSortChange: (column: SortColumn, ascending: boolean) => void;
 }
 
-type SortColumn = "name" | "path" | "size" | "date_modified";
-
-export function TablePanel({ results, selectedIndex, multiSelected, onSelect, onExecute, onSortChange }: Props) {
-  const [sortColumn, setSortColumn] = useState<SortColumn>("date_modified");
-  const [sortAscending, setSortAscending] = useState(false);
-
+export function TablePanel({ results, selectedIndex, multiSelected, sortColumn, sortAscending, onSelect, onExecute, onSortChange }: Props) {
   const handleHeaderClick = (col: SortColumn) => {
     if (col === sortColumn) {
-      const newDir = !sortAscending;
-      setSortAscending(newDir);
-      onSortChange(col, newDir);
+      onSortChange(col, !sortAscending);
     } else {
-      setSortColumn(col);
-      setSortAscending(col === "name" || col === "path"); // alpha defaults asc, others desc
       onSortChange(col, col === "name" || col === "path");
     }
   };
@@ -127,4 +120,4 @@ function formatDate(epoch?: number): string {
   return date.toISOString().slice(0, 10);
 }
 
-export type { TableResult };
+export type { TableResult, SortColumn };
