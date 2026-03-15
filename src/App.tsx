@@ -396,10 +396,18 @@ export function App() {
     [flatResults, selectedIndex, grouped, executeResult, expandCategory, expandedCategory, query, contextMenuIndex, contextActionIndex, executeContextAction, showHelp, previewData]
   );
 
-  // Scroll selected item into view
+  // Scroll selected item into view — if it's the first in a group, scroll the group header instead
   useEffect(() => {
     const el = document.querySelector(".result-item.selected");
-    el?.scrollIntoView({ block: "nearest" });
+    if (el) {
+      const prev = el.previousElementSibling;
+      if (prev && prev.classList.contains("result-group-header")) {
+        // First item in group — scroll the header into view so it's visible
+        prev.scrollIntoView({ block: "nearest" });
+      } else {
+        el.scrollIntoView({ block: "nearest" });
+      }
+    }
   }, [selectedIndex]);
 
   // Resize window — anchor top position, only grow downward
