@@ -78,6 +78,33 @@ pub fn refresh_apps(state: State<AppState>) {
 }
 
 #[tauri::command]
+pub fn expand_category(query: &str, category: &str, state: State<AppState>) -> Vec<SearchResult> {
+    let query = query.trim();
+    if query.is_empty() {
+        return vec![];
+    }
+    let config = state.config.lock().unwrap().clone();
+    let apps = state.apps.lock().unwrap().clone();
+    let max = 50; // expanded limit
+
+    match category {
+        "Apps" => {
+            let results = EverythingProvider::search_apps(query, max);
+            if results.is_empty() {
+                AppProvider::search(&apps, query, max)
+            } else {
+                results
+            }
+        }
+        "Files" => EverythingProvider::search_files(query, max),
+        "Directories" => EverythingProvider::search_dirs(query, max),
+        "System" => SystemProvider::evaluate(query),
+        "Web" => WebSearchProvider::evaluate(query, &config.search_engine),
+        _ => vec![],
+    }
+}
+
+#[tauri::command]
 pub fn get_config(state: State<AppState>) -> OmniConfig {
     state.config.lock().unwrap().clone()
 }

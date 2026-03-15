@@ -15,22 +15,17 @@ html, body {
 
 #app {
   height: 100%;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 12px;
 }
 
 .omni-container {
   background: rgba(20, 20, 25, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
+  border-radius: 0;
   overflow: hidden;
   width: 100%;
+  height: 100%;
   animation: fadeIn 0.1s ease-out;
   display: flex;
   flex-direction: column;
-  max-height: calc(100vh - 24px);
 }
 
 @keyframes fadeIn {
@@ -94,6 +89,22 @@ html, body {
   letter-spacing: 0.05em;
   color: rgba(255, 255, 255, 0.35);
   padding: 8px 12px 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.group-hint {
+  font-size: 10px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: rgba(255, 255, 255, 0.2);
+  font-style: italic;
+}
+
+.result-group.active-group {
+  border-color: rgba(100, 140, 255, 0.15);
 }
 
 .result-item {

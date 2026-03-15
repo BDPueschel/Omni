@@ -19,6 +19,7 @@ export function App() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [copiedFlash, setCopiedFlash] = useState(false);
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const debounceRef = useRef<number | null>(null);
 
   const grouped = CATEGORY_ORDER.map((cat) => ({
@@ -31,6 +32,7 @@ export function App() {
   const handleInput = useCallback((value: string) => {
     setQuery(value);
     setSelectedIndex(0);
+    setExpandedCategory(null);
 
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
@@ -86,6 +88,40 @@ export function App() {
     [flatResults]
   );
 
+  // Find which category the selected index belongs to
+  const getSelectedCategory = useCallback((): string | null => {
+    let count = 0;
+    for (const g of grouped) {
+      if (count + g.results.length > selectedIndex) {
+        return g.category;
+      }
+      count += g.results.length;
+    }
+    return null;
+  }, [grouped, selectedIndex]);
+
+  const expandCategory = useCallback(async () => {
+    const cat = getSelectedCategory();
+    if (!cat || cat === "Math" || cat === "URL") return; // these don't expand
+
+    try {
+      const expanded = await invoke<SearchResult[]>("expand_category", {
+        query,
+        category: cat,
+      });
+      if (expanded.length > 0) {
+        // Replace results in this category with expanded results
+        setResults((prev) => {
+          const other = prev.filter((r) => r.category !== cat);
+          return [...other, ...expanded];
+        });
+        setExpandedCategory(cat);
+      }
+    } catch (e) {
+      console.error("Expand error:", e);
+    }
+  }, [query, getSelectedCategory]);
+
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       switch (e.key) {
@@ -120,13 +156,28 @@ export function App() {
           }
           setSelectedIndex(nextIndex);
           break;
+        case "e":
+        case "E":
+          // Expand current category to show all results
+          if (flatResults.length > 0) {
+            e.preventDefault();
+            expandCategory();
+          }
+          break;
         case "Escape":
           e.preventDefault();
-          invoke("hide_window");
+          if (expandedCategory) {
+            // First Escape collapses back to normal results
+            setExpandedCategory(null);
+            // Re-search with normal limits
+            invoke<SearchResult[]>("search", { query }).then(setResults);
+          } else {
+            invoke("hide_window");
+          }
           break;
       }
     },
-    [flatResults, selectedIndex, grouped, executeResult]
+    [flatResults, selectedIndex, grouped, executeResult, expandCategory, expandedCategory, query]
   );
 
   // Scroll selected item into view
@@ -145,15 +196,17 @@ export function App() {
 
         let targetHeight: number;
         if (flatResults.length === 0 && !query.trim()) {
-          targetHeight = 68;
+          targetHeight = 52;
         } else if (flatResults.length === 0) {
-          targetHeight = 130;
+          targetHeight = 110;
         } else {
-          const base = 56 + 16 + 2 + 24 + 24;
+          const base = 52 + 24;
           const groupCost = grouped.length * 38;
           const resultCost = flatResults.length * 44;
           targetHeight = base + groupCost + resultCost;
-          targetHeight = Math.min(targetHeight, 800);
+          // Allow up to 80% of screen height
+          const maxH = window.screen.availHeight * 0.75;
+          targetHeight = Math.min(targetHeight, maxH);
         }
 
         // Only resize height, don't re-center — keeps search bar anchored
@@ -181,6 +234,7 @@ export function App() {
   }, []);
 
   let globalIndex = 0;
+  const activeCategory = getSelectedCategory();
 
   return (
     <div class="omni-container">
@@ -198,6 +252,8 @@ export function App() {
                 selectedIndex={selectedIndex}
                 globalStartIndex={startIndex}
                 onExecute={executeResult}
+                isActive={group.category === activeCategory}
+                isExpanded={group.category === expandedCategory}
               />
             );
           })}

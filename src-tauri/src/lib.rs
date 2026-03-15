@@ -114,6 +114,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             search::search,
+            search::expand_category,
             search::refresh_apps,
             search::get_config,
             search::save_config,
