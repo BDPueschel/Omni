@@ -475,7 +475,7 @@ export function App() {
         } else if (flatResults.length === 0) {
           targetHeight = 110;
         } else {
-          const base = 52 + 24;
+          const base = 52 + 44;
           const groupCost = grouped.length * 38;
           const resultCost = flatResults.length * 44;
           targetHeight = base + groupCost + resultCost;
