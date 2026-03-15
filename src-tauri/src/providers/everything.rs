@@ -88,6 +88,15 @@ impl EverythingProvider {
         }
     }
 
+    /// Convert "car toml" into "*car*toml*" for fuzzy fragment matching.
+    fn wildcardify(query: &str) -> String {
+        let parts: Vec<&str> = query.split_whitespace().collect();
+        if parts.is_empty() {
+            return String::new();
+        }
+        format!("*{}*", parts.join("*"))
+    }
+
     /// General file search.
     pub fn search(query: &str, max_results: usize) -> Vec<SearchResult> {
         if Self::find_es_exe().is_none() {
@@ -102,8 +111,9 @@ impl EverythingProvider {
             }];
         }
 
+        let wildcard_query = Self::wildcardify(query);
         let max_str = max_results.to_string();
-        match Self::run_es(&["-n", &max_str, query]) {
+        match Self::run_es(&["-n", &max_str, &wildcard_query]) {
             Ok(paths) => Self::format_file_results(paths),
             Err(e) => {
                 eprintln!("Everything search error: {}", e);
@@ -122,7 +132,8 @@ impl EverythingProvider {
         let mut all_paths = Vec::new();
 
         // Search Start Menu shortcuts (.lnk) — best source for apps
-        let lnk_query = format!("{}*.lnk", query);
+        let wildcard = Self::wildcardify(query);
+        let lnk_query = format!("{}.lnk", wildcard);
         for start_menu in &[
             "C:\\ProgramData\\Microsoft\\Windows\\Start Menu",
             "C:\\Users\\Brian\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu",
@@ -134,7 +145,7 @@ impl EverythingProvider {
 
         // Also search for .exe in Program Files if we have few results
         if all_paths.len() < max_results {
-            let exe_query = format!("{}*.exe", query);
+            let exe_query = format!("{}.exe", wildcard);
             for prog_dir in &[
                 "C:\\Program Files",
                 "C:\\Program Files (x86)",
