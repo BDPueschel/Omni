@@ -536,7 +536,10 @@ export function App() {
               e.preventDefault();
               const cols: Array<SortColumn> = ["name", "path", "size", "date_modified"];
               const col = cols[parseInt(e.key) - 1];
-              const asc = col === "name" || col === "path";
+              // Toggle direction if same column, else use default for that column
+              const asc = col === tableSortColumn
+                ? !tableSortAscending
+                : (col === "name" || col === "path");
               setTableSortColumn(col);
               setTableSortAscending(asc);
               fetchTableResults(query, col, asc);
