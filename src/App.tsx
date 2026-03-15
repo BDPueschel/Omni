@@ -135,19 +135,24 @@ export function App() {
     el?.scrollIntoView({ block: "nearest" });
   }, [selectedIndex]);
 
-  // Resize window to fit content — compact when empty, full when results
+  // Resize window to fit content dynamically
+  const containerRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const hasContent = flatResults.length > 0 || query.trim();
-    (async () => {
+    // Small delay to let DOM render before measuring
+    const timer = setTimeout(async () => {
       const { getCurrentWindow } = await import("@tauri-apps/api/window");
       const { LogicalSize } = await import("@tauri-apps/api/dpi");
       const win = getCurrentWindow();
-      if (hasContent) {
-        await win.setSize(new LogicalSize(600, 500));
+      const el = containerRef.current;
+      if (el) {
+        // Measure actual content height + margin
+        const height = Math.min(Math.max(el.scrollHeight + 16, 62), 700);
+        await win.setSize(new LogicalSize(600, height));
       } else {
         await win.setSize(new LogicalSize(600, 62));
       }
-    })();
+    }, 30);
+    return () => clearTimeout(timer);
   }, [flatResults.length, query]);
 
   // Listen for backend events
@@ -169,7 +174,7 @@ export function App() {
   let globalIndex = 0;
 
   return (
-    <div class="omni-container">
+    <div class="omni-container" ref={containerRef}>
       <SearchInput value={query} onInput={handleInput} onKeyDown={handleKeyDown} />
       {flatResults.length > 0 ? (
         <div class="results-container">
