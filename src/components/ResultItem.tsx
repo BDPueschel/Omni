@@ -82,6 +82,7 @@ function getIcon(icon: string, subtitle: string): IconInfo {
   const iconMap: Record<string, IconInfo> = {
     calculator: { symbol: "=", color: "#2ecc71" },
     app:        { symbol: "◆", color: "#6fc3df" },
+    folder:     { symbol: "📁", color: "#f39c12" },
     file:       { symbol: "●", color: dim },
     search:     { symbol: "⌕", color: dim },
     globe:      { symbol: "⊕", color: "#3498db" },

@@ -97,20 +97,58 @@ impl EverythingProvider {
         format!("*{}*", parts.join("*"))
     }
 
-    /// General file search.
-    pub fn search(query: &str, max_results: usize) -> Vec<SearchResult> {
+    /// Check if es.exe is available, return error result if not.
+    fn unavailable_result() -> Vec<SearchResult> {
+        vec![SearchResult {
+            category: "Files".to_string(),
+            title: "Everything search not available".to_string(),
+            subtitle: "es.exe not found — reinstall Omni or Everything".to_string(),
+            action: ResultAction::OpenUrl {
+                url: "https://www.voidtools.com/downloads/".to_string(),
+            },
+            icon: "alert".to_string(),
+        }]
+    }
+
+    /// Search for files only (no directories).
+    pub fn search_files(query: &str, max_results: usize) -> Vec<SearchResult> {
         if Self::find_es_exe().is_none() {
-            return vec![SearchResult {
-                category: "Files".to_string(),
-                title: "Everything search not available".to_string(),
-                subtitle: "es.exe not found — reinstall Omni or Everything".to_string(),
-                action: ResultAction::OpenUrl {
-                    url: "https://www.voidtools.com/downloads/".to_string(),
-                },
-                icon: "alert".to_string(),
-            }];
+            return Self::unavailable_result();
         }
 
+        let wildcard_query = Self::wildcardify(query);
+        let max_str = max_results.to_string();
+        match Self::run_es(&["-n", &max_str, "-a-d", &wildcard_query]) {
+            Ok(paths) => Self::format_file_results(paths),
+            Err(e) => {
+                eprintln!("Everything file search error: {}", e);
+                vec![]
+            }
+        }
+    }
+
+    /// Search for directories only.
+    pub fn search_dirs(query: &str, max_results: usize) -> Vec<SearchResult> {
+        if Self::find_es_exe().is_none() {
+            return vec![];
+        }
+
+        let wildcard_query = Self::wildcardify(query);
+        let max_str = max_results.to_string();
+        match Self::run_es(&["-n", &max_str, "-ad", &wildcard_query]) {
+            Ok(paths) => Self::format_dir_results(paths),
+            Err(e) => {
+                eprintln!("Everything dir search error: {}", e);
+                vec![]
+            }
+        }
+    }
+
+    /// Legacy method for tests — searches both files and dirs.
+    pub fn search(query: &str, max_results: usize) -> Vec<SearchResult> {
+        if Self::find_es_exe().is_none() {
+            return Self::unavailable_result();
+        }
         let wildcard_query = Self::wildcardify(query);
         let max_str = max_results.to_string();
         match Self::run_es(&["-n", &max_str, &wildcard_query]) {
@@ -206,6 +244,26 @@ impl EverythingProvider {
                     subtitle: path.clone(),
                     action: ResultAction::LaunchApp { path },
                     icon: "app".to_string(),
+                }
+            })
+            .collect()
+    }
+
+    fn format_dir_results(paths: Vec<String>) -> Vec<SearchResult> {
+        paths
+            .into_iter()
+            .map(|path| {
+                let dirname = Path::new(&path)
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string();
+                SearchResult {
+                    category: "Directories".to_string(),
+                    title: dirname,
+                    subtitle: path.clone(),
+                    action: ResultAction::OpenFile { path },
+                    icon: "folder".to_string(),
                 }
             })
             .collect()

@@ -50,9 +50,11 @@ pub fn search_query(
     let system_results = SystemProvider::evaluate(query);
     all_results.extend(system_results.into_iter().take(max));
 
-    // Everything file search
-    let files = EverythingProvider::search(query, max);
-    all_results.extend(files);
+    // Everything file search (files only, no directories)
+    all_results.extend(EverythingProvider::search_files(query, max));
+
+    // Everything directory search
+    all_results.extend(EverythingProvider::search_dirs(query, max));
 
     // Web search fallback (suppress if only math or URL)
     if !has_math && !has_url {
