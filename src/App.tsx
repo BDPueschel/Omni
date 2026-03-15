@@ -457,6 +457,15 @@ export function App() {
               <div class="help-row"><kbd>Ctrl+H</kbd><span>Toggle this help</span></div>
             </div>
           </div>
+          <div class="help-section" style="margin-top: 10px;">
+            <div class="help-section-title">Search Syntax</div>
+            <div class="help-row"><kbd>C:\path\</kbd><span>Scope search to a directory</span></div>
+            <div class="help-row"><kbd>F:\docs\report</kbd><span>Search "report" in F:\docs\</span></div>
+            <div class="help-row"><kbd>*.rs</kbd><span>Wildcard extension match</span></div>
+            <div class="help-row"><kbd>foo | bar</kbd><span>OR — match either term</span></div>
+            <div class="help-row"><kbd>!node_modules</kbd><span>NOT — exclude term</span></div>
+            <div class="help-row"><kbd>foo bar</kbd><span>Fuzzy fragments (matches *foo*bar*)</span></div>
+          </div>
         </div>
       )}
     </div>

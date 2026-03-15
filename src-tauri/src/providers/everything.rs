@@ -97,6 +97,81 @@ impl EverythingProvider {
         format!("*{}*", parts.join("*"))
     }
 
+    /// Detect if query contains a path prefix (e.g. "C:\", "F:/", "\\server").
+    /// Returns (path, remaining_query) if found, or None.
+    fn parse_path_context(query: &str) -> Option<(String, String)> {
+        let trimmed = query.trim();
+
+        // Match drive letter paths: C:\..., C:/...
+        if trimmed.len() >= 3
+            && trimmed.as_bytes()[0].is_ascii_alphabetic()
+            && trimmed.as_bytes()[1] == b':'
+            && (trimmed.as_bytes()[2] == b'\\' || trimmed.as_bytes()[2] == b'/')
+        {
+            // Find the last separator — everything before is path, after is query
+            let normalized = trimmed.replace('/', "\\");
+            if let Some(last_sep) = normalized.rfind('\\') {
+                let path = &normalized[..=last_sep];
+                let remainder = normalized[last_sep + 1..].trim().to_string();
+                return Some((path.to_string(), remainder));
+            }
+        }
+
+        // Match UNC paths: \\server\share\...
+        if trimmed.starts_with("\\\\") {
+            let normalized = trimmed.replace('/', "\\");
+            if let Some(last_sep) = normalized.rfind('\\') {
+                if last_sep > 1 {
+                    let path = &normalized[..=last_sep];
+                    let remainder = normalized[last_sep + 1..].trim().to_string();
+                    return Some((path.to_string(), remainder));
+                }
+            }
+        }
+
+        None
+    }
+
+    /// Check if query uses Everything-style operators (pass raw, don't wildcardify).
+    fn is_raw_query(query: &str) -> bool {
+        let q = query.trim();
+        q.contains('*') || q.contains('?') || q.contains('|')
+            || q.contains("ext:") || q.contains("size:")
+            || q.contains("dm:") || q.contains("dc:")
+            || q.contains("regex:") || q.contains("!")
+            || q.contains("parent:") || q.contains("startwith:")
+            || q.contains("endwith:")
+    }
+
+    /// Build es.exe args for a query, handling path context and raw operators.
+    fn build_search_args(query: &str, max_results: usize, extra_flags: &[&str]) -> Vec<String> {
+        let max_str = max_results.to_string();
+        let mut args: Vec<String> = vec!["-n".to_string(), max_str];
+
+        for flag in extra_flags {
+            args.push(flag.to_string());
+        }
+
+        if let Some((path, remainder)) = Self::parse_path_context(query) {
+            args.push("-path".to_string());
+            args.push(path);
+            if remainder.is_empty() {
+                args.push("*".to_string());
+            } else if Self::is_raw_query(&remainder) {
+                args.push(remainder);
+            } else {
+                args.push(Self::wildcardify(&remainder));
+            }
+        } else if Self::is_raw_query(query) {
+            // Pass through raw — user is using Everything operators
+            args.push(query.trim().to_string());
+        } else {
+            args.push(Self::wildcardify(query));
+        }
+
+        args
+    }
+
     /// Check if es.exe is available, return error result if not.
     fn unavailable_result() -> Vec<SearchResult> {
         vec![SearchResult {
@@ -116,9 +191,9 @@ impl EverythingProvider {
             return Self::unavailable_result();
         }
 
-        let wildcard_query = Self::wildcardify(query);
-        let max_str = max_results.to_string();
-        match Self::run_es(&["-n", &max_str, "-a-d", "-sort-date-modified-descending", &wildcard_query]) {
+        let args = Self::build_search_args(query, max_results, &["-a-d", "-sort-date-modified-descending"]);
+        let arg_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+        match Self::run_es(&arg_refs) {
             Ok(paths) => Self::format_file_results(paths),
             Err(e) => {
                 eprintln!("Everything file search error: {}", e);
@@ -133,9 +208,9 @@ impl EverythingProvider {
             return vec![];
         }
 
-        let wildcard_query = Self::wildcardify(query);
-        let max_str = max_results.to_string();
-        match Self::run_es(&["-n", &max_str, "-ad", &wildcard_query]) {
+        let args = Self::build_search_args(query, max_results, &["-ad"]);
+        let arg_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+        match Self::run_es(&arg_refs) {
             Ok(paths) => Self::format_dir_results(paths),
             Err(e) => {
                 eprintln!("Everything dir search error: {}", e);
@@ -144,14 +219,14 @@ impl EverythingProvider {
         }
     }
 
-    /// Legacy method for tests — searches both files and dirs.
+    /// General search (files and dirs) — used by tests and expand.
     pub fn search(query: &str, max_results: usize) -> Vec<SearchResult> {
         if Self::find_es_exe().is_none() {
             return Self::unavailable_result();
         }
-        let wildcard_query = Self::wildcardify(query);
-        let max_str = max_results.to_string();
-        match Self::run_es(&["-n", &max_str, &wildcard_query]) {
+        let args = Self::build_search_args(query, max_results, &[]);
+        let arg_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+        match Self::run_es(&arg_refs) {
             Ok(paths) => Self::format_file_results(paths),
             Err(e) => {
                 eprintln!("Everything search error: {}", e);
