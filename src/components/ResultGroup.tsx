@@ -24,7 +24,7 @@ export function ResultGroup({ category, results, selectedIndex, globalStartIndex
   if (results.length === 0) return null;
 
   const canExpand = EXPANDABLE.includes(category) && !isExpanded;
-  const hint = isExpanded ? "expanded" : canExpand && isActive ? "press E to expand" : "";
+  const hint = isExpanded ? "expanded" : canExpand && isActive ? "Ctrl+E to expand" : "";
 
   return (
     <div class={`result-group ${isActive ? "active-group" : ""}`}>

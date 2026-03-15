@@ -158,8 +158,8 @@ export function App() {
           break;
         case "e":
         case "E":
-          // Expand current category to show all results
-          if (flatResults.length > 0) {
+          // Ctrl+E to expand current category
+          if (e.ctrlKey && flatResults.length > 0) {
             e.preventDefault();
             expandCategory();
           }
