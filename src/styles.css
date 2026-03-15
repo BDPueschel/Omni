@@ -228,3 +228,68 @@ html, body {
   background: rgba(130, 180, 255, 0.12);
   color: #e0e0e0;
 }
+
+/* Help overlay (Ctrl+H) */
+.help-overlay {
+  margin: 8px 12px 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  animation: fadeIn 0.1s ease-out;
+}
+
+.help-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.help-dismiss {
+  font-size: 10px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.2);
+  font-style: italic;
+}
+
+.help-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.help-section-title {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(130, 180, 255, 0.5);
+  margin-bottom: 6px;
+}
+
+.help-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.help-row kbd {
+  font-family: "Segoe UI", monospace;
+  font-size: 10px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  padding: 1px 5px;
+  min-width: 40px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.6);
+  flex-shrink: 0;
+}

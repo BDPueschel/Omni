@@ -23,6 +23,7 @@ export function App() {
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [contextMenuIndex, setContextMenuIndex] = useState<number | null>(null);
   const [contextActionIndex, setContextActionIndex] = useState(0);
+  const [showHelp, setShowHelp] = useState(false);
   const debounceRef = useRef<number | null>(null);
 
   const grouped = CATEGORY_ORDER.map((cat) => ({
@@ -266,9 +267,18 @@ export function App() {
             expandCategory();
           }
           break;
+        case "h":
+        case "H":
+          if (e.ctrlKey) {
+            e.preventDefault();
+            setShowHelp((v) => !v);
+          }
+          break;
         case "Escape":
           e.preventDefault();
-          if (expandedCategory) {
+          if (showHelp) {
+            setShowHelp(false);
+          } else if (expandedCategory) {
             setExpandedCategory(null);
             invoke<SearchResult[]>("search", { query }).then(setResults);
           } else {
@@ -277,7 +287,7 @@ export function App() {
           break;
       }
     },
-    [flatResults, selectedIndex, grouped, executeResult, expandCategory, expandedCategory, query, contextMenuIndex, contextActionIndex, executeContextAction]
+    [flatResults, selectedIndex, grouped, executeResult, expandCategory, expandedCategory, query, contextMenuIndex, contextActionIndex, executeContextAction, showHelp]
   );
 
   // Scroll selected item into view
@@ -370,6 +380,32 @@ export function App() {
       ) : query.trim() ? (
         <div class="empty-state">No results found</div>
       ) : null}
+      {showHelp && (
+        <div class="help-overlay">
+          <div class="help-title">Keyboard Shortcuts <span class="help-dismiss">Ctrl+H to close</span></div>
+          <div class="help-grid">
+            <div class="help-section">
+              <div class="help-section-title">Navigation</div>
+              <div class="help-row"><kbd>↑ ↓</kbd><span>Move between results</span></div>
+              <div class="help-row"><kbd>Tab</kbd><span>Jump to next category</span></div>
+              <div class="help-row"><kbd>Ctrl+↑</kbd><span>Start of category</span></div>
+              <div class="help-row"><kbd>Ctrl+↓</kbd><span>End of category</span></div>
+              <div class="help-row"><kbd>Home</kbd><span>First result</span></div>
+              <div class="help-row"><kbd>End</kbd><span>Last result</span></div>
+              <div class="help-row"><kbd>PgUp/PgDn</kbd><span>Category bounds</span></div>
+            </div>
+            <div class="help-section">
+              <div class="help-section-title">Actions</div>
+              <div class="help-row"><kbd>Enter</kbd><span>Open / execute</span></div>
+              <div class="help-row"><kbd>→</kbd><span>Context menu</span></div>
+              <div class="help-row"><kbd>←</kbd><span>Close context menu</span></div>
+              <div class="help-row"><kbd>Ctrl+E</kbd><span>Expand category (50 results)</span></div>
+              <div class="help-row"><kbd>Escape</kbd><span>Collapse / hide</span></div>
+              <div class="help-row"><kbd>Ctrl+H</kbd><span>Toggle this help</span></div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
