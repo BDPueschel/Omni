@@ -296,7 +296,15 @@ export function App() {
   return (
     <div class="omni-container">
       <SearchInput value={query} onInput={handleInput} onKeyDown={handleKeyDown} />
-      {flatResults.length > 0 ? (
+      {contextMenuIndex !== null && flatResults[contextMenuIndex] ? (
+        <div class="results-container">
+          <ContextMenu
+            result={flatResults[contextMenuIndex]}
+            selectedAction={contextActionIndex}
+            onExecute={executeContextAction}
+          />
+        </div>
+      ) : flatResults.length > 0 ? (
         <div class="results-container">
           {grouped.map((group) => {
             const startIndex = globalIndex;
@@ -314,14 +322,6 @@ export function App() {
               />
             );
           })}
-          {contextMenuIndex !== null && flatResults[contextMenuIndex] && (
-            <ContextMenu
-              result={flatResults[contextMenuIndex]}
-              selectedAction={contextActionIndex}
-              onClose={() => { setContextMenuIndex(null); setContextActionIndex(0); }}
-              onExecute={executeContextAction}
-            />
-          )}
           {copiedFlash && <div class="copied-flash">Copied!</div>}
         </div>
       ) : query.trim() ? (

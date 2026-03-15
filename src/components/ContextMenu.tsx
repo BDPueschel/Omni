@@ -17,7 +17,6 @@ interface ContextAction {
 interface Props {
   result: SearchResult;
   selectedAction: number;
-  onClose: () => void;
   onExecute: (index: number) => void;
 }
 
