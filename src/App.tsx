@@ -176,15 +176,50 @@ export function App() {
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      // Preview is open — Escape closes it
+      // Preview is open — navigate within preview
       if (previewData) {
-        if (e.key === "Escape") {
-          e.preventDefault();
-          setPreviewData(null);
-          return;
+        const previewContent = document.querySelector(".preview-content");
+        const scrollAmount = 100;
+        switch (e.key) {
+          case "Escape":
+            e.preventDefault();
+            setPreviewData(null);
+            return;
+          case "ArrowDown":
+            e.preventDefault();
+            if (e.ctrlKey) {
+              previewContent?.scrollTo({ top: previewContent.scrollHeight, behavior: "smooth" });
+            } else {
+              previewContent?.scrollBy({ top: scrollAmount, behavior: "smooth" });
+            }
+            return;
+          case "ArrowUp":
+            e.preventDefault();
+            if (e.ctrlKey) {
+              previewContent?.scrollTo({ top: 0, behavior: "smooth" });
+            } else {
+              previewContent?.scrollBy({ top: -scrollAmount, behavior: "smooth" });
+            }
+            return;
+          case "Home":
+            e.preventDefault();
+            previewContent?.scrollTo({ top: 0, behavior: "smooth" });
+            return;
+          case "End":
+            e.preventDefault();
+            previewContent?.scrollTo({ top: previewContent.scrollHeight, behavior: "smooth" });
+            return;
+          case "PageDown":
+            e.preventDefault();
+            previewContent?.scrollBy({ top: previewContent.clientHeight * 0.8, behavior: "smooth" });
+            return;
+          case "PageUp":
+            e.preventDefault();
+            previewContent?.scrollBy({ top: -(previewContent.clientHeight * 0.8), behavior: "smooth" });
+            return;
+          default:
+            return;
         }
-        // Block other keys while preview is showing (except Escape handled above)
-        return;
       }
 
       // Context menu is open — handle its navigation
@@ -531,7 +566,7 @@ export function App() {
               <div class="help-row"><kbd>Shift+→</kbd><span>Context menu</span></div>
               <div class="help-row"><kbd>Shift+←</kbd><span>Close context menu</span></div>
               <div class="help-row"><kbd>Ctrl+E</kbd><span>Expand category (50 results)</span></div>
-              <div class="help-row"><kbd>Ctrl+Space</kbd><span>Preview file</span></div>
+              <div class="help-row"><kbd>Ctrl+Space</kbd><span>Preview file (↑↓ scroll, PgUp/Dn page)</span></div>
               <div class="help-row"><kbd>Escape</kbd><span>Collapse / hide</span></div>
               <div class="help-row"><kbd>Ctrl+H</kbd><span>Toggle this help</span></div>
             </div>
