@@ -38,18 +38,25 @@ export function ResultItem({ result, isSelected, onExecute }: Props) {
     }
   }, [result.subtitle, result.icon]);
 
+  const isColorSwatch = result.icon.startsWith("color:");
+  const colorHex = isColorSwatch ? result.icon.slice(6) : null;
+
   return (
     <div
       class={`result-item ${isSelected ? "selected" : ""}`}
       onClick={onExecute}
     >
-      <div class="result-icon" style={{ color: iconInfo.color }}>
-        {iconUri ? (
-          <img src={iconUri} class="result-icon-img" />
-        ) : (
-          iconInfo.symbol
-        )}
-      </div>
+      {isColorSwatch ? (
+        <div class="result-icon" style={{ background: colorHex!, borderRadius: '4px' }}></div>
+      ) : (
+        <div class="result-icon" style={{ color: iconInfo.color }}>
+          {iconUri ? (
+            <img src={iconUri} class="result-icon-img" />
+          ) : (
+            iconInfo.symbol
+          )}
+        </div>
+      )}
       <div class="result-text">
         <div class="result-title">{result.title}</div>
         <div class="result-subtitle">{result.subtitle}</div>

@@ -13,7 +13,7 @@ interface SearchResult {
   icon: string;
 }
 
-const CATEGORY_ORDER = ["Math", "Apps", "System", "Processes", "Files", "Directories", "URL", "Web"];
+const CATEGORY_ORDER = ["Math", "Color", "Apps", "System", "Processes", "Files", "Directories", "URL", "Web"];
 
 export function App() {
   const [query, setQuery] = useState("");

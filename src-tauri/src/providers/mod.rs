@@ -1,4 +1,5 @@
 pub mod apps;
+pub mod color;
 pub mod currency;
 pub mod everything;
 pub mod math;

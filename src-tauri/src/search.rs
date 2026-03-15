@@ -1,5 +1,6 @@
 use crate::config::OmniConfig;
 use crate::providers::apps::{AppEntry, AppProvider};
+use crate::providers::color::ColorProvider;
 use crate::providers::currency::CurrencyProvider;
 use crate::providers::everything::EverythingProvider;
 use crate::providers::math::MathProvider;
@@ -30,6 +31,11 @@ pub fn search_query(
     }
 
     let mut all_results: Vec<SearchResult> = Vec::new();
+
+    // Color detection (#hex, rgb(), hsl())
+    let color = ColorProvider::evaluate(query);
+    let has_color = !color.is_empty();
+    all_results.extend(color);
 
     // Unit conversion (most specific — "5km in miles")
     let units = UnitProvider::evaluate(query);
@@ -80,7 +86,7 @@ pub fn search_query(
     all_results.extend(EverythingProvider::search_dirs(query, max));
 
     // Web search fallback (suppress if we have a precise match)
-    if !has_math && !has_url && !has_units && !has_currency {
+    if !has_math && !has_url && !has_units && !has_currency && !has_color {
         all_results.extend(WebSearchProvider::evaluate(query, search_engine));
     }
 
