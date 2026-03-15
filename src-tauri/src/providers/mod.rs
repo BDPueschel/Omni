@@ -1,8 +1,10 @@
 pub mod apps;
+pub mod currency;
 pub mod everything;
 pub mod math;
-pub mod url;
 pub mod system;
+pub mod units;
+pub mod url;
 pub mod web_search;
 
 use serde::{Deserialize, Serialize};

@@ -93,6 +93,8 @@ function getIcon(icon: string, subtitle: string): IconInfo {
     trash:      { symbol: "♻", color: "#95a5a6" },
     "log-out":  { symbol: "→", color: "#e67e22" },
     alert:      { symbol: "⚠", color: "#f39c12" },
+    unit:       { symbol: "↔", color: "#2ecc71" },
+    currency:   { symbol: "$", color: "#f1c40f" },
   };
 
   return iconMap[icon] || { symbol: "•", color: dim };

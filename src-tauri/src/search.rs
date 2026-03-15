@@ -1,8 +1,10 @@
 use crate::config::OmniConfig;
 use crate::providers::apps::{AppEntry, AppProvider};
+use crate::providers::currency::CurrencyProvider;
 use crate::providers::everything::EverythingProvider;
 use crate::providers::math::MathProvider;
 use crate::providers::system::SystemProvider;
+use crate::providers::units::UnitProvider;
 use crate::providers::url::UrlProvider;
 use crate::providers::web_search::WebSearchProvider;
 use crate::providers::SearchResult;
@@ -28,8 +30,22 @@ pub fn search_query(
 
     let mut all_results: Vec<SearchResult> = Vec::new();
 
-    // Math (highest priority)
-    let math = MathProvider::evaluate(query);
+    // Unit conversion (most specific — "5km in miles")
+    let units = UnitProvider::evaluate(query);
+    let has_units = !units.is_empty();
+    all_results.extend(units);
+
+    // Currency conversion ("100 usd to eur")
+    let currency = CurrencyProvider::evaluate(query);
+    let has_currency = !currency.is_empty();
+    all_results.extend(currency);
+
+    // Math (skip if we already matched a unit/currency conversion)
+    let math = if has_units || has_currency {
+        vec![]
+    } else {
+        MathProvider::evaluate(query)
+    };
     let has_math = !math.is_empty();
     all_results.extend(math);
 
@@ -56,8 +72,8 @@ pub fn search_query(
     // Everything directory search
     all_results.extend(EverythingProvider::search_dirs(query, max));
 
-    // Web search fallback (suppress if only math or URL)
-    if !has_math && !has_url {
+    // Web search fallback (suppress if we have a precise match)
+    if !has_math && !has_url && !has_units && !has_currency {
         all_results.extend(WebSearchProvider::evaluate(query, search_engine));
     }
 

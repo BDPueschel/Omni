@@ -4,7 +4,7 @@ use omni_lib::config::OmniConfig;
 fn test_default_config() {
     let config = OmniConfig::default();
     assert_eq!(config.hotkey, "Alt+Space");
-    assert_eq!(config.max_results_per_category, 5);
+    assert_eq!(config.max_results_per_category, 10);
     assert_eq!(config.search_engine, "google");
     assert!(config.start_with_windows);
     assert_eq!(config.theme_opacity, 80);
