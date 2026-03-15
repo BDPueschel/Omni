@@ -135,6 +135,12 @@ html, body {
   margin-right: 10px;
 }
 
+.result-icon-img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
 .result-text {
   flex: 1;
   min-width: 0;

@@ -1,5 +1,6 @@
 pub mod autostart;
 pub mod config;
+pub mod icons;
 pub mod providers;
 pub mod search;
 
@@ -124,6 +125,7 @@ pub fn run() {
             search::save_config,
             search::execute_action,
             search::hide_window,
+            icons::get_icon,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
