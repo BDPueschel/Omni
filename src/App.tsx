@@ -135,25 +135,28 @@ export function App() {
     el?.scrollIntoView({ block: "nearest" });
   }, [selectedIndex]);
 
-  // Resize window to fit content dynamically
-  const containerRef = useRef<HTMLDivElement>(null);
+  // Resize window to fit content — calculate from result count
   useEffect(() => {
-    // Small delay to let DOM render before measuring
-    const timer = setTimeout(async () => {
+    (async () => {
       const { getCurrentWindow } = await import("@tauri-apps/api/window");
       const { LogicalSize } = await import("@tauri-apps/api/dpi");
       const win = getCurrentWindow();
-      const el = containerRef.current;
-      if (el) {
-        // Measure actual content height + margin
-        const height = Math.min(Math.max(el.scrollHeight + 16, 62), 700);
-        await win.setSize(new LogicalSize(600, height));
-      } else {
+
+      if (flatResults.length === 0 && !query.trim()) {
+        // Just the search bar
         await win.setSize(new LogicalSize(600, 62));
+      } else if (flatResults.length === 0) {
+        // "No results found" state
+        await win.setSize(new LogicalSize(600, 120));
+      } else {
+        // Calculate: search bar (~54px) + padding (16px) + per group header (28px) + per result row (42px) + group margins
+        const numGroups = grouped.length;
+        const numResults = flatResults.length;
+        const height = 54 + 16 + (numGroups * 36) + (numResults * 42) + 8;
+        await win.setSize(new LogicalSize(600, Math.min(height, 700)));
       }
-    }, 30);
-    return () => clearTimeout(timer);
-  }, [flatResults.length, query]);
+    })();
+  }, [flatResults.length, grouped.length, query]);
 
   // Listen for backend events
   useEffect(() => {
@@ -174,7 +177,7 @@ export function App() {
   let globalIndex = 0;
 
   return (
-    <div class="omni-container" ref={containerRef}>
+    <div class="omni-container">
       <SearchInput value={query} onInput={handleInput} onKeyDown={handleKeyDown} />
       {flatResults.length > 0 ? (
         <div class="results-container">
