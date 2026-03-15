@@ -164,6 +164,12 @@ export function App() {
             executeContextAction(contextActionIndex);
             return;
           case "ArrowLeft":
+            if (e.shiftKey) {
+              e.preventDefault();
+              setContextMenuIndex(null);
+              setContextActionIndex(0);
+            }
+            return;
           case "Escape":
             e.preventDefault();
             setContextMenuIndex(null);
@@ -187,13 +193,47 @@ export function App() {
         return { start: 0, end: flatResults.length - 1 };
       };
 
+      // Helper: get the start index of the next/prev category
+      const getNextCategoryStart = () => {
+        let start = 0;
+        let foundCurrent = false;
+        for (const g of grouped) {
+          if (foundCurrent) return start;
+          const end = start + g.results.length - 1;
+          if (selectedIndex >= start && selectedIndex <= end) {
+            foundCurrent = true;
+          }
+          start = end + 1;
+        }
+        return flatResults.length - 1; // stay at end if last category
+      };
+
+      const getPrevCategoryEnd = () => {
+        let start = 0;
+        let prevEnd = 0;
+        for (const g of grouped) {
+          const end = start + g.results.length - 1;
+          if (selectedIndex >= start && selectedIndex <= end) {
+            return prevEnd > 0 ? prevEnd : 0;
+          }
+          prevEnd = end;
+          start = end + 1;
+        }
+        return 0;
+      };
+
       // Normal result navigation
       switch (e.key) {
         case "ArrowDown":
           e.preventDefault();
           if (e.ctrlKey) {
-            // Ctrl+Down: jump to end of current category
-            setSelectedIndex(getCategoryBounds().end);
+            const bounds = getCategoryBounds();
+            if (selectedIndex === bounds.end) {
+              // Already at end of category — jump to next category
+              setSelectedIndex(Math.min(getNextCategoryStart(), flatResults.length - 1));
+            } else {
+              setSelectedIndex(bounds.end);
+            }
           } else {
             setSelectedIndex((i) => Math.min(i + 1, flatResults.length - 1));
           }
@@ -201,35 +241,48 @@ export function App() {
         case "ArrowUp":
           e.preventDefault();
           if (e.ctrlKey) {
-            // Ctrl+Up: jump to start of current category
-            setSelectedIndex(getCategoryBounds().start);
+            const bounds = getCategoryBounds();
+            if (selectedIndex === bounds.start) {
+              // Already at start of category — jump to prev category end
+              setSelectedIndex(Math.max(getPrevCategoryEnd(), 0));
+            } else {
+              setSelectedIndex(bounds.start);
+            }
           } else {
             setSelectedIndex((i) => Math.max(i - 1, 0));
           }
           break;
         case "Home":
-          // Absolute start
           e.preventDefault();
           setSelectedIndex(0);
           break;
         case "End":
-          // Absolute end
           e.preventDefault();
           setSelectedIndex(flatResults.length - 1);
           break;
-        case "PageDown":
-          // Same as Ctrl+Down: jump to end of current category
+        case "PageDown": {
           e.preventDefault();
-          setSelectedIndex(getCategoryBounds().end);
+          const bounds = getCategoryBounds();
+          if (selectedIndex === bounds.end) {
+            setSelectedIndex(Math.min(getNextCategoryStart(), flatResults.length - 1));
+          } else {
+            setSelectedIndex(bounds.end);
+          }
           break;
-        case "PageUp":
-          // Same as Ctrl+Up: jump to start of current category
+        }
+        case "PageUp": {
           e.preventDefault();
-          setSelectedIndex(getCategoryBounds().start);
+          const bounds = getCategoryBounds();
+          if (selectedIndex === bounds.start) {
+            setSelectedIndex(Math.max(getPrevCategoryEnd(), 0));
+          } else {
+            setSelectedIndex(bounds.start);
+          }
           break;
+        }
         case "ArrowRight":
-          // Open context menu for selected result
-          if (flatResults.length > 0) {
+          // Shift+Right: open context menu
+          if (e.shiftKey && flatResults.length > 0) {
             const result = flatResults[selectedIndex];
             if (result && getActions(result).length > 0) {
               e.preventDefault();
@@ -388,8 +441,8 @@ export function App() {
               <div class="help-section-title">Navigation</div>
               <div class="help-row"><kbd>↑ ↓</kbd><span>Move between results</span></div>
               <div class="help-row"><kbd>Tab</kbd><span>Jump to next category</span></div>
-              <div class="help-row"><kbd>Ctrl+↑</kbd><span>Start of category</span></div>
-              <div class="help-row"><kbd>Ctrl+↓</kbd><span>End of category</span></div>
+              <div class="help-row"><kbd>Ctrl+↑</kbd><span>Category start, then prev</span></div>
+              <div class="help-row"><kbd>Ctrl+↓</kbd><span>Category end, then next</span></div>
               <div class="help-row"><kbd>Home</kbd><span>First result</span></div>
               <div class="help-row"><kbd>End</kbd><span>Last result</span></div>
               <div class="help-row"><kbd>PgUp/PgDn</kbd><span>Category bounds</span></div>
@@ -397,8 +450,8 @@ export function App() {
             <div class="help-section">
               <div class="help-section-title">Actions</div>
               <div class="help-row"><kbd>Enter</kbd><span>Open / execute</span></div>
-              <div class="help-row"><kbd>→</kbd><span>Context menu</span></div>
-              <div class="help-row"><kbd>←</kbd><span>Close context menu</span></div>
+              <div class="help-row"><kbd>Shift+→</kbd><span>Context menu</span></div>
+              <div class="help-row"><kbd>Shift+←</kbd><span>Close context menu</span></div>
               <div class="help-row"><kbd>Ctrl+E</kbd><span>Expand category (50 results)</span></div>
               <div class="help-row"><kbd>Escape</kbd><span>Collapse / hide</span></div>
               <div class="help-row"><kbd>Ctrl+H</kbd><span>Toggle this help</span></div>

@@ -62,7 +62,7 @@ export function ContextMenu({ result, selectedAction, onExecute }: Props) {
     <div class="context-menu">
       <div class="context-menu-header">
         {result.title}
-        <span class="context-hint">← back</span>
+        <span class="context-hint">Shift+← back</span>
       </div>
       {actions.map((action, i) => (
         <div
