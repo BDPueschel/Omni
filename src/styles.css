@@ -61,6 +61,13 @@ html, body {
   opacity: 0.4;
 }
 
+.search-icon-img {
+  width: 24px;
+  height: 24px;
+  margin: 0 8px;
+  flex-shrink: 0;
+}
+
 .results-container {
   flex: 1;
   overflow-y: auto;
