@@ -8,6 +8,7 @@ import { PreviewPanel } from "./components/PreviewPanel";
 import type { FilePreview } from "./components/PreviewPanel";
 import { TablePanel } from "./components/TablePanel";
 import type { TableResult, SortColumn } from "./components/TablePanel";
+import { DEFAULT_COLUMN_ORDER } from "./components/TablePanel";
 
 interface SearchResult {
   category: string;
@@ -69,6 +70,7 @@ export function App() {
   const [tableSortColumn, setTableSortColumn] = useState<SortColumn>("date_modified");
   const [tableSortAscending, setTableSortAscending] = useState(false);
   const [tableContextResult, setTableContextResult] = useState<SearchResult | null>(null);
+  const [columnOrder, setColumnOrder] = useState<SortColumn[]>([...DEFAULT_COLUMN_ORDER]);
   const [originalWindowPos, setOriginalWindowPos] = useState<{ x: number; y: number } | null>(null);
   const debounceRef = useRef<number | null>(null);
 
@@ -83,6 +85,17 @@ export function App() {
     : grouped;
 
   const flatResults = leftGrouped.flatMap((g) => g.results);
+
+  const saveColumnOrder = useCallback(async (newOrder: SortColumn[]) => {
+    setColumnOrder(newOrder);
+    try {
+      const config = await invoke<Record<string, any>>("get_config");
+      config.table_column_order = newOrder;
+      await invoke("save_config", { config });
+    } catch (e) {
+      console.error("Save column order error:", e);
+    }
+  }, []);
 
   const fetchTableResults = useCallback(async (q: string, sortBy = "date_modified", asc = false) => {
     if (!q.trim()) return;
@@ -482,18 +495,36 @@ export function App() {
             }
             return;
           case "ArrowRight":
-            if (e.shiftKey && tableResults.length > 0) {
+            if (e.ctrlKey && e.shiftKey) {
+              // Ctrl+Shift+Right: move sorted column one position right
+              e.preventDefault();
+              const colIdx = columnOrder.indexOf(tableSortColumn);
+              if (colIdx < columnOrder.length - 1) {
+                const newOrder = [...columnOrder];
+                [newOrder[colIdx], newOrder[colIdx + 1]] = [newOrder[colIdx + 1], newOrder[colIdx]];
+                saveColumnOrder(newOrder);
+              }
+            } else if (e.shiftKey && tableResults.length > 0) {
               e.preventDefault();
               const tr = tableResults[tableSelectedIndex];
               if (tr) {
                 setTableContextResult(tr as SearchResult);
-                setContextMenuIndex(-2); // -2 signals table context menu
+                setContextMenuIndex(-2);
                 setContextActionIndex(0);
               }
             }
             return;
           case "ArrowLeft":
-            if (e.ctrlKey) {
+            if (e.ctrlKey && e.shiftKey) {
+              // Ctrl+Shift+Left: move sorted column one position left
+              e.preventDefault();
+              const colIdx = columnOrder.indexOf(tableSortColumn);
+              if (colIdx > 0) {
+                const newOrder = [...columnOrder];
+                [newOrder[colIdx - 1], newOrder[colIdx]] = [newOrder[colIdx], newOrder[colIdx - 1]];
+                saveColumnOrder(newOrder);
+              }
+            } else if (e.ctrlKey) {
               // Ctrl+Left: jump focus back to result list
               e.preventDefault();
               setActivePanel("results");
@@ -534,8 +565,7 @@ export function App() {
           case "1": case "2": case "3": case "4": case "5":
             if (e.ctrlKey) {
               e.preventDefault();
-              const cols: Array<SortColumn> = ["type", "name", "path", "size", "date_modified"];
-              const col = cols[parseInt(e.key) - 1];
+              const col = columnOrder[parseInt(e.key) - 1];
               // Toggle direction if same column, else use default for that column
               const asc = col === tableSortColumn
                 ? !tableSortAscending
@@ -888,7 +918,7 @@ export function App() {
           const maxH = window.screen.availHeight * 0.85;
           targetHeight = Math.min(500, maxH);
         } else if (showHelp) {
-          targetHeight = 520;
+          targetHeight = 560;
         } else if (flatResults.length === 0 && !query.trim()) {
           targetHeight = 52;
         } else if (flatResults.length === 0) {
@@ -930,6 +960,15 @@ export function App() {
       }
     })();
   }, [flatResults.length, leftGrouped.length, query, showHelp, previewData, tableOpen]);
+
+  // Load column order from config on mount
+  useEffect(() => {
+    invoke<{ table_column_order?: string[] }>("get_config").then((config) => {
+      if (config.table_column_order && config.table_column_order.length === DEFAULT_COLUMN_ORDER.length) {
+        setColumnOrder(config.table_column_order as SortColumn[]);
+      }
+    }).catch(() => {});
+  }, []);
 
   // Listen for backend events
   useEffect(() => {
@@ -1048,7 +1087,9 @@ export function App() {
                 }}
                 sortColumn={tableSortColumn}
                 sortAscending={tableSortAscending}
+                columnOrder={columnOrder}
                 onSortChange={(col, asc) => { setTableSortColumn(col); setTableSortAscending(asc); fetchTableResults(query, col, asc); }}
+                onColumnReorder={saveColumnOrder}
               />
             )}
           </div>
@@ -1142,6 +1183,7 @@ export function App() {
               <div class="help-row"><kbd>Escape</kbd><span>Collapse / hide</span></div>
               <div class="help-row"><kbd>Ctrl+T</kbd><span>Table view (file columns)</span></div>
               <div class="help-row"><kbd>Ctrl+1-5</kbd><span>Sort table by column</span></div>
+              <div class="help-row"><kbd>Ctrl+Shift+←→</kbd><span>Reorder table columns</span></div>
               <div class="help-row"><kbd>Ctrl+H</kbd><span>Toggle this help</span></div>
             </div>
           </div>

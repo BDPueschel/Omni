@@ -536,6 +536,22 @@ html, body {
   flex-shrink: 0;
 }
 
+.col-dragging {
+  opacity: 0.4;
+}
+
+.col-drag-over {
+  border-left: 2px solid rgba(130, 180, 255, 0.7);
+}
+
+.table-header .table-col {
+  cursor: grab;
+}
+
+.table-header .table-col:active {
+  cursor: grabbing;
+}
+
 .table-icon {
   font-size: 9px;
   font-weight: 700;
