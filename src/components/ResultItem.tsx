@@ -13,12 +13,16 @@ interface Props {
 }
 
 export function ResultItem({ result, isSelected, onExecute }: Props) {
+  const iconInfo = getIcon(result.icon, result.subtitle);
+
   return (
     <div
       class={`result-item ${isSelected ? "selected" : ""}`}
       onClick={onExecute}
     >
-      <div class="result-icon">{getIcon(result.icon, result.subtitle)}</div>
+      <div class="result-icon" style={{ color: iconInfo.color }}>
+        {iconInfo.symbol}
+      </div>
       <div class="result-text">
         <div class="result-title">{result.title}</div>
         <div class="result-subtitle">{result.subtitle}</div>
@@ -27,50 +31,68 @@ export function ResultItem({ result, isSelected, onExecute }: Props) {
   );
 }
 
-function getIcon(icon: string, subtitle: string): string {
-  // File-type specific icons based on extension in subtitle path
+interface IconInfo {
+  symbol: string;
+  color: string;
+}
+
+function getIcon(icon: string, subtitle: string): IconInfo {
+  const dim = "rgba(255,255,255,0.5)";
+
+  // File-type icons based on extension
   if (icon === "file" && subtitle) {
-    const ext = subtitle.split('.').pop()?.toLowerCase();
-    const extIcons: Record<string, string> = {
-      exe: "\u{1F4E6}",
-      lnk: "\u{1F517}",
-      pdf: "\u{1F4D1}",
-      txt: "\u{1F4DD}",
-      md: "\u{1F4DD}",
-      jpg: "\u{1F5BC}",
-      jpeg: "\u{1F5BC}",
-      png: "\u{1F5BC}",
-      gif: "\u{1F5BC}",
-      mp3: "\u{1F3B5}",
-      wav: "\u{1F3B5}",
-      mp4: "\u{1F3AC}",
-      avi: "\u{1F3AC}",
-      zip: "\u{1F4E6}",
-      rar: "\u{1F4E6}",
-      py: "\u{1F40D}",
-      rs: "\u{2699}",
-      js: "\u{1F7E8}",
-      ts: "\u{1F7E6}",
-      json: "\u{1F4CB}",
-      html: "\u{1F310}",
-      css: "\u{1F3A8}",
+    const ext = subtitle.split('.').pop()?.toLowerCase() || "";
+    const extMap: Record<string, IconInfo> = {
+      exe:  { symbol: "⬡", color: "#6fc3df" },
+      lnk:  { symbol: "🔗", color: dim },
+      pdf:  { symbol: "PDF", color: "#e74c3c" },
+      txt:  { symbol: "TXT", color: dim },
+      md:   { symbol: "MD", color: dim },
+      log:  { symbol: "LOG", color: dim },
+      jpg:  { symbol: "IMG", color: "#e67e22" },
+      jpeg: { symbol: "IMG", color: "#e67e22" },
+      png:  { symbol: "IMG", color: "#e67e22" },
+      gif:  { symbol: "GIF", color: "#e67e22" },
+      svg:  { symbol: "SVG", color: "#e67e22" },
+      mp3:  { symbol: "♪", color: "#9b59b6" },
+      wav:  { symbol: "♪", color: "#9b59b6" },
+      flac: { symbol: "♪", color: "#9b59b6" },
+      mp4:  { symbol: "▶", color: "#e74c3c" },
+      avi:  { symbol: "▶", color: "#e74c3c" },
+      mkv:  { symbol: "▶", color: "#e74c3c" },
+      zip:  { symbol: "ZIP", color: "#f39c12" },
+      rar:  { symbol: "RAR", color: "#f39c12" },
+      "7z": { symbol: "7Z", color: "#f39c12" },
+      py:   { symbol: "PY", color: "#3498db" },
+      rs:   { symbol: "RS", color: "#e67e22" },
+      js:   { symbol: "JS", color: "#f1c40f" },
+      ts:   { symbol: "TS", color: "#3498db" },
+      json: { symbol: "{}", color: "#95a5a6" },
+      html: { symbol: "<>", color: "#e67e22" },
+      css:  { symbol: "#", color: "#3498db" },
+      toml: { symbol: "CFG", color: "#95a5a6" },
+      yaml: { symbol: "YML", color: "#95a5a6" },
+      yml:  { symbol: "YML", color: "#95a5a6" },
     };
-    if (ext && extIcons[ext]) return extIcons[ext];
+    if (extMap[ext]) return extMap[ext];
+    return { symbol: "●", color: dim };
   }
 
-  const icons: Record<string, string> = {
-    calculator: "\u{1F9EE}",
-    app: "\u{25B6}",
-    file: "\u{1F4C4}",
-    search: "\u{1F50D}",
-    globe: "\u{1F310}",
-    lock: "\u{1F512}",
-    moon: "\u{1F319}",
-    power: "\u{23FB}",
-    refresh: "\u{1F504}",
-    trash: "\u{1F5D1}",
-    "log-out": "\u{1F6AA}",
-    alert: "\u{26A0}",
+  // Category icons
+  const iconMap: Record<string, IconInfo> = {
+    calculator: { symbol: "=", color: "#2ecc71" },
+    app:        { symbol: "◆", color: "#6fc3df" },
+    file:       { symbol: "●", color: dim },
+    search:     { symbol: "⌕", color: dim },
+    globe:      { symbol: "⊕", color: "#3498db" },
+    lock:       { symbol: "🔒", color: "#f39c12" },
+    moon:       { symbol: "☽", color: "#9b59b6" },
+    power:      { symbol: "⏻", color: "#e74c3c" },
+    refresh:    { symbol: "↻", color: "#3498db" },
+    trash:      { symbol: "♻", color: "#95a5a6" },
+    "log-out":  { symbol: "→", color: "#e67e22" },
+    alert:      { symbol: "⚠", color: "#f39c12" },
   };
-  return icons[icon] || "\u{2022}";
+
+  return iconMap[icon] || { symbol: "•", color: dim };
 }
