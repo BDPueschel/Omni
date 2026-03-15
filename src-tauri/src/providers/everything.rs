@@ -365,6 +365,21 @@ impl EverythingProvider {
             .collect()
     }
 
+    /// Complete a partial path to matching directories (for Tab completion).
+    pub fn complete_path(partial: &str, max: usize) -> Vec<String> {
+        if Self::find_es_exe().is_none() {
+            return vec![];
+        }
+
+        // Search for directories matching the partial path
+        let query = format!("{}*", partial);
+        let max_str = max.to_string();
+        match Self::run_es(&["-n", &max_str, "-ad", &query]) {
+            Ok(paths) => paths,
+            Err(_) => vec![],
+        }
+    }
+
     pub fn format_results(paths: Vec<String>) -> Vec<SearchResult> {
         Self::format_file_results(paths)
     }

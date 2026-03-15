@@ -32,6 +32,33 @@ pub fn search_query(
 
     let mut all_results: Vec<SearchResult> = Vec::new();
 
+    // Clipboard history (triggered by "clip" or "cb" prefix)
+    let lower = query.to_lowercase();
+    if lower == "clip" || lower == "cb" || lower.starts_with("clip ") || lower.starts_with("cb ") {
+        let clip_query = if lower.starts_with("clip ") {
+            &query[5..]
+        } else if lower.starts_with("cb ") {
+            &query[3..]
+        } else {
+            ""
+        };
+        let entries =
+            crate::clipboard::get_clipboard_history_internal(clip_query, max as u32);
+        for entry in entries {
+            let pin_prefix = if entry.pinned { "\u{1f4cc} " } else { "" };
+            all_results.push(SearchResult {
+                category: "Clipboard".to_string(),
+                title: entry.preview.clone(),
+                subtitle: format!("{}{}", pin_prefix, entry.timestamp),
+                action: ResultAction::Copy {
+                    text: entry.content,
+                },
+                icon: "clipboard".to_string(),
+            });
+        }
+        return all_results;
+    }
+
     // Color detection (#hex, rgb(), hsl())
     let color = ColorProvider::evaluate(query);
     let has_color = !color.is_empty();
@@ -149,6 +176,28 @@ pub fn expand_category(query: &str, category: &str, state: State<AppState>) -> V
         "System" => SystemProvider::evaluate(query),
         "Processes" => ProcessProvider::evaluate(query),
         "Web" => WebSearchProvider::evaluate(query, &config.search_engine),
+        "Clipboard" => {
+            let clip_query = if query.to_lowercase().starts_with("clip ") {
+                &query[5..]
+            } else if query.to_lowercase().starts_with("cb ") {
+                &query[3..]
+            } else {
+                ""
+            };
+            crate::clipboard::get_clipboard_history_internal(clip_query, 50)
+                .into_iter()
+                .map(|entry| {
+                    let pin_prefix = if entry.pinned { "\u{1f4cc} " } else { "" };
+                    SearchResult {
+                        category: "Clipboard".to_string(),
+                        title: entry.preview.clone(),
+                        subtitle: format!("{}{}", pin_prefix, entry.timestamp),
+                        action: ResultAction::Copy { text: entry.content },
+                        icon: "clipboard".to_string(),
+                    }
+                })
+                .collect()
+        }
         _ => vec![],
     }
 }
@@ -399,6 +448,17 @@ pub fn get_frequent_items() -> Vec<SearchResult> {
 #[tauri::command]
 pub fn clear_usage_data() {
     crate::usage::clear_usage();
+}
+
+#[tauri::command]
+pub fn complete_path(partial: String) -> Vec<String> {
+    use crate::providers::everything::EverythingProvider;
+
+    // Normalize forward slashes to backslashes
+    let partial = partial.replace("/", "\\");
+
+    // Search for matching directories
+    EverythingProvider::complete_path(&partial, 5)
 }
 
 /// Dry-run version for testing — validates the command name without executing.

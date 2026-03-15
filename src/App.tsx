@@ -15,7 +15,7 @@ interface SearchResult {
   icon: string;
 }
 
-const CATEGORY_ORDER = ["Frequent", "Math", "Color", "Apps", "System", "Processes", "Files", "Directories", "URL", "Web"];
+const CATEGORY_ORDER = ["Frequent", "Math", "Color", "Apps", "System", "Clipboard", "Processes", "Files", "Directories", "URL", "Web"];
 
 export function App() {
   const [query, setQuery] = useState("");
@@ -27,6 +27,8 @@ export function App() {
   const [contextActionIndex, setContextActionIndex] = useState(0);
   const [showHelp, setShowHelp] = useState(false);
   const [previewData, setPreviewData] = useState<FilePreview | null>(null);
+  const [completionCandidates, setCompletionCandidates] = useState<string[]>([]);
+  const [completionIndex, setCompletionIndex] = useState(0);
   const debounceRef = useRef<number | null>(null);
 
   const grouped = CATEGORY_ORDER.map((cat) => ({
@@ -43,6 +45,8 @@ export function App() {
     setContextMenuIndex(null);
     setContextActionIndex(0);
     setPreviewData(null);
+    setCompletionCandidates([]);
+    setCompletionIndex(0);
 
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
@@ -374,21 +378,43 @@ export function App() {
           break;
         case "Tab":
           e.preventDefault();
-          let currentGroup = 0;
-          let count = 0;
-          for (const g of grouped) {
-            if (count + g.results.length > selectedIndex) {
-              currentGroup = grouped.indexOf(g);
-              break;
+          // Path completion: if query looks like a path
+          if (/^[a-zA-Z]:[\\\/]/.test(query) || query.startsWith("\\\\")) {
+            if (completionCandidates.length > 0) {
+              // Cycle through existing candidates
+              const nextIdx = e.shiftKey
+                ? (completionIndex - 1 + completionCandidates.length) % completionCandidates.length
+                : (completionIndex + 1) % completionCandidates.length;
+              setCompletionIndex(nextIdx);
+              setQuery(completionCandidates[nextIdx] + "\\");
+            } else {
+              // Fetch candidates
+              invoke<string[]>("complete_path", { partial: query }).then((candidates) => {
+                if (candidates.length > 0) {
+                  setCompletionCandidates(candidates);
+                  setCompletionIndex(0);
+                  setQuery(candidates[0] + "\\");
+                }
+              });
             }
-            count += g.results.length;
+          } else {
+            // Normal category jump
+            let currentGroup = 0;
+            let count = 0;
+            for (const g of grouped) {
+              if (count + g.results.length > selectedIndex) {
+                currentGroup = grouped.indexOf(g);
+                break;
+              }
+              count += g.results.length;
+            }
+            const nextGroup = (currentGroup + 1) % grouped.length;
+            let nextIndex = 0;
+            for (let i = 0; i < nextGroup; i++) {
+              nextIndex += grouped[i].results.length;
+            }
+            setSelectedIndex(nextIndex);
           }
-          const nextGroup = (currentGroup + 1) % grouped.length;
-          let nextIndex = 0;
-          for (let i = 0; i < nextGroup; i++) {
-            nextIndex += grouped[i].results.length;
-          }
-          setSelectedIndex(nextIndex);
           break;
         case "c":
         case "C":
@@ -440,7 +466,7 @@ export function App() {
           break;
       }
     },
-    [flatResults, selectedIndex, grouped, executeResult, expandCategory, expandedCategory, query, contextMenuIndex, contextActionIndex, executeContextAction, showHelp, previewData]
+    [flatResults, selectedIndex, grouped, executeResult, expandCategory, expandedCategory, query, contextMenuIndex, contextActionIndex, executeContextAction, showHelp, previewData, completionCandidates, completionIndex]
   );
 
   // Scroll selected item into view with padding for group headers

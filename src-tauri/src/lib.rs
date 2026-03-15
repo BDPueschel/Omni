@@ -1,4 +1,5 @@
 pub mod autostart;
+pub mod clipboard;
 pub mod config;
 pub mod icons;
 pub mod preview;
@@ -105,6 +106,9 @@ pub fn run() {
                 })
                 .build(app)?;
 
+            // Start clipboard monitor
+            crate::clipboard::start_monitor();
+
             // Auto-start registration
             let config = app.state::<AppState>().config.lock().unwrap().clone();
             if config.start_with_windows && !autostart::is_autostart_enabled() {
@@ -135,8 +139,13 @@ pub fn run() {
             search::record_selection,
             search::get_frequent_items,
             search::clear_usage_data,
+            search::complete_path,
             icons::get_icon,
             preview::preview_file,
+            clipboard::get_clipboard_history,
+            clipboard::delete_clipboard_entry,
+            clipboard::pin_clipboard_entry,
+            clipboard::clear_clipboard_history,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

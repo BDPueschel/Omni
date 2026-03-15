@@ -130,6 +130,7 @@ function getIcon(icon: string, subtitle: string): IconInfo {
     unit:       { symbol: "\u2194", color: "#2ecc71" },
     currency:   { symbol: "$", color: "#f1c40f" },
     process:    { symbol: "\u00D7", color: "#e74c3c" },
+    clipboard:  { symbol: "CB", color: "#9b59b6" },
   };
 
   return iconMap[icon] || { symbol: "\u2022", color: dim };
