@@ -22,10 +22,18 @@ type IsDBLoaded = unsafe extern "system" fn() -> i32;
 static EVERYTHING_LIB: OnceLock<Option<Library>> = OnceLock::new();
 
 fn default_dll_paths() -> Vec<String> {
-    vec![
+    let mut paths = vec![
         "C:\\Program Files\\Everything\\Everything64.dll".to_string(),
+        "C:\\Program Files\\Everything 1.5a\\Everything64.dll".to_string(),
         "C:\\Program Files (x86)\\Everything\\Everything64.dll".to_string(),
-    ]
+    ];
+    // Also check next to our own executable
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            paths.insert(0, dir.join("Everything64.dll").to_string_lossy().to_string());
+        }
+    }
+    paths
 }
 
 pub struct EverythingProvider;
