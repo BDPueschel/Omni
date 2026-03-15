@@ -104,6 +104,67 @@ pub fn expand_category(query: &str, category: &str, state: State<AppState>) -> V
     }
 }
 
+/// Context menu actions for power users.
+#[tauri::command]
+pub fn open_containing_folder(path: &str) -> Result<(), String> {
+    std::process::Command::new("explorer.exe")
+        .args(["/select,", path])
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn open_in_terminal(path: &str) -> Result<(), String> {
+    let dir = if std::path::Path::new(path).is_dir() {
+        path.to_string()
+    } else {
+        std::path::Path::new(path)
+            .parent()
+            .unwrap_or(std::path::Path::new("C:\\"))
+            .to_string_lossy()
+            .to_string()
+    };
+    std::process::Command::new("wt.exe")
+        .args(["-d", &dir])
+        .spawn()
+        .or_else(|_| {
+            // Fallback to powershell if Windows Terminal isn't installed
+            std::process::Command::new("powershell.exe")
+                .args(["-NoExit", "-Command", &format!("Set-Location '{}'", dir)])
+                .spawn()
+        })
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn open_in_vscode(path: &str) -> Result<(), String> {
+    let target = if std::path::Path::new(path).is_dir() {
+        path.to_string()
+    } else {
+        std::path::Path::new(path)
+            .parent()
+            .unwrap_or(std::path::Path::new("C:\\"))
+            .to_string_lossy()
+            .to_string()
+    };
+    std::process::Command::new("code")
+        .arg(&target)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn run_as_admin(path: &str) -> Result<(), String> {
+    std::process::Command::new("powershell.exe")
+        .args(["-Command", &format!("Start-Process '{}' -Verb RunAs", path)])
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 #[tauri::command]
 pub fn get_config(state: State<AppState>) -> OmniConfig {
     state.config.lock().unwrap().clone()

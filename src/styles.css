@@ -104,7 +104,8 @@ html, body {
 }
 
 .result-group.active-group {
-  border-color: rgba(100, 140, 255, 0.15);
+  border-color: rgba(130, 180, 255, 0.25);
+  background: rgba(130, 180, 255, 0.03);
 }
 
 .result-item {
@@ -179,4 +180,51 @@ html, body {
   20% { opacity: 1; transform: translateX(-50%) translateY(0); }
   80% { opacity: 1; }
   100% { opacity: 0; }
+}
+
+/* Context menu (arrow right) */
+.context-menu {
+  margin: 4px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(130, 180, 255, 0.2);
+  border-radius: 8px;
+  overflow: hidden;
+  animation: slideIn 0.1s ease-out;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.context-menu-header {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+  padding: 8px 12px 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.context-hint {
+  font-size: 10px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.2);
+  font-style: italic;
+}
+
+.context-action {
+  padding: 8px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.1s;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.context-action:hover,
+.context-action.selected {
+  background: rgba(130, 180, 255, 0.12);
+  color: #e0e0e0;
 }

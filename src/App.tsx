@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { SearchInput } from "./components/SearchInput";
 import { ResultGroup } from "./components/ResultGroup";
+import { ContextMenu, getActions } from "./components/ContextMenu";
 
 interface SearchResult {
   category: string;
@@ -20,6 +21,8 @@ export function App() {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [copiedFlash, setCopiedFlash] = useState(false);
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+  const [contextMenuIndex, setContextMenuIndex] = useState<number | null>(null);
+  const [contextActionIndex, setContextActionIndex] = useState(0);
   const debounceRef = useRef<number | null>(null);
 
   const grouped = CATEGORY_ORDER.map((cat) => ({
@@ -33,6 +36,8 @@ export function App() {
     setQuery(value);
     setSelectedIndex(0);
     setExpandedCategory(null);
+    setContextMenuIndex(null);
+    setContextActionIndex(0);
 
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
@@ -122,8 +127,53 @@ export function App() {
     }
   }, [query, getSelectedCategory]);
 
+  const executeContextAction = useCallback(async (actionIndex: number) => {
+    const result = flatResults[contextMenuIndex!];
+    if (!result) return;
+    const actions = getActions(result);
+    if (actionIndex >= 0 && actionIndex < actions.length) {
+      try {
+        await actions[actionIndex].handler();
+      } catch (e) {
+        console.error("Context action error:", e);
+      }
+    }
+    setContextMenuIndex(null);
+    setContextActionIndex(0);
+  }, [flatResults, contextMenuIndex]);
+
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
+      // Context menu is open — handle its navigation
+      if (contextMenuIndex !== null) {
+        const result = flatResults[contextMenuIndex];
+        const actions = result ? getActions(result) : [];
+
+        switch (e.key) {
+          case "ArrowDown":
+            e.preventDefault();
+            setContextActionIndex((i) => Math.min(i + 1, actions.length - 1));
+            return;
+          case "ArrowUp":
+            e.preventDefault();
+            setContextActionIndex((i) => Math.max(i - 1, 0));
+            return;
+          case "Enter":
+            e.preventDefault();
+            executeContextAction(contextActionIndex);
+            return;
+          case "ArrowLeft":
+          case "Escape":
+            e.preventDefault();
+            setContextMenuIndex(null);
+            setContextActionIndex(0);
+            return;
+          default:
+            return;
+        }
+      }
+
+      // Normal result navigation
       switch (e.key) {
         case "ArrowDown":
           e.preventDefault();
@@ -133,13 +183,23 @@ export function App() {
           e.preventDefault();
           setSelectedIndex((i) => Math.max(i - 1, 0));
           break;
+        case "ArrowRight":
+          // Open context menu for selected result
+          if (flatResults.length > 0) {
+            const result = flatResults[selectedIndex];
+            if (result && getActions(result).length > 0) {
+              e.preventDefault();
+              setContextMenuIndex(selectedIndex);
+              setContextActionIndex(0);
+            }
+          }
+          break;
         case "Enter":
           e.preventDefault();
           executeResult(selectedIndex);
           break;
         case "Tab":
           e.preventDefault();
-          // Jump to next category
           let currentGroup = 0;
           let count = 0;
           for (const g of grouped) {
@@ -158,7 +218,6 @@ export function App() {
           break;
         case "e":
         case "E":
-          // Ctrl+E to expand current category
           if (e.ctrlKey && flatResults.length > 0) {
             e.preventDefault();
             expandCategory();
@@ -167,9 +226,7 @@ export function App() {
         case "Escape":
           e.preventDefault();
           if (expandedCategory) {
-            // First Escape collapses back to normal results
             setExpandedCategory(null);
-            // Re-search with normal limits
             invoke<SearchResult[]>("search", { query }).then(setResults);
           } else {
             invoke("hide_window");
@@ -177,7 +234,7 @@ export function App() {
           break;
       }
     },
-    [flatResults, selectedIndex, grouped, executeResult, expandCategory, expandedCategory, query]
+    [flatResults, selectedIndex, grouped, executeResult, expandCategory, expandedCategory, query, contextMenuIndex, contextActionIndex, executeContextAction]
   );
 
   // Scroll selected item into view
@@ -257,6 +314,14 @@ export function App() {
               />
             );
           })}
+          {contextMenuIndex !== null && flatResults[contextMenuIndex] && (
+            <ContextMenu
+              result={flatResults[contextMenuIndex]}
+              selectedAction={contextActionIndex}
+              onClose={() => { setContextMenuIndex(null); setContextActionIndex(0); }}
+              onExecute={executeContextAction}
+            />
+          )}
           {copiedFlash && <div class="copied-flash">Copied!</div>}
         </div>
       ) : query.trim() ? (

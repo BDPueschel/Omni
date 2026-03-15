@@ -15,7 +15,7 @@ impl Default for OmniConfig {
     fn default() -> Self {
         Self {
             hotkey: "Alt+Space".to_string(),
-            max_results_per_category: 5,
+            max_results_per_category: 10,
             search_engine: "google".to_string(),
             start_with_windows: true,
             theme_opacity: 80,
