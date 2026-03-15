@@ -358,7 +358,9 @@ export function App() {
         const win = getCurrentWindow();
 
         let targetHeight: number;
-        if (flatResults.length === 0 && !query.trim()) {
+        if (showHelp) {
+          targetHeight = 420; // search bar + full help overlay
+        } else if (flatResults.length === 0 && !query.trim()) {
           targetHeight = 52;
         } else if (flatResults.length === 0) {
           targetHeight = 110;
@@ -367,7 +369,6 @@ export function App() {
           const groupCost = grouped.length * 38;
           const resultCost = flatResults.length * 44;
           targetHeight = base + groupCost + resultCost;
-          // Allow up to 80% of screen height
           const maxH = window.screen.availHeight * 0.75;
           targetHeight = Math.min(targetHeight, maxH);
         }
@@ -378,7 +379,7 @@ export function App() {
         console.error(`[Omni resize] ERROR:`, e);
       }
     })();
-  }, [flatResults.length, grouped.length, query]);
+  }, [flatResults.length, grouped.length, query, showHelp]);
 
   // Listen for backend events
   useEffect(() => {
