@@ -118,7 +118,7 @@ impl EverythingProvider {
 
         let wildcard_query = Self::wildcardify(query);
         let max_str = max_results.to_string();
-        match Self::run_es(&["-n", &max_str, "-a-d", &wildcard_query]) {
+        match Self::run_es(&["-n", &max_str, "-a-d", "-sort-date-modified-descending", &wildcard_query]) {
             Ok(paths) => Self::format_file_results(paths),
             Err(e) => {
                 eprintln!("Everything file search error: {}", e);
