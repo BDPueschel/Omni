@@ -19,7 +19,7 @@ Add an Everything-style sortable column view to Omni that opens as a side panel 
 ## Focus Model
 
 - When the table opens, keyboard focus moves to the table panel.
-- **Tab** cycles focus between the result list and the table panel.
+- **Panel cycling:** Ctrl+Tab cycles focus between the result list and the table panel. (Regular Tab retains its existing behavior: path completion when the query looks like a path, category jumping otherwise.)
 - **Escape** closes the table and returns focus to the result list.
 - **Ctrl+T** also closes the table (toggle behavior).
 - **Visual indicator:** The active panel has a thin accent-colored border and slightly brighter background. The inactive panel dims slightly. This makes it always clear where keystrokes are going.
@@ -49,6 +49,8 @@ Add an Everything-style sortable column view to Omni that opens as a side panel 
 - **Shift+Right** opens the context menu (same actions as the existing context menu).
 - **Ctrl+Space** opens the file preview, replacing the table content in the same panel space. Ctrl+Space again closes the preview and returns to the table.
 - **Shift+Up/Down** multi-selects rows. Batch context menu works the same as the current result list.
+- **Multi-select is per-panel.** Switching panels via Ctrl+Tab clears the multi-selection. No cross-panel multi-select.
+- **Enter with multi-select:** Batch-opens all selected items (same as the existing result list behavior).
 
 ## Backend Changes
 
@@ -66,22 +68,27 @@ pub struct SearchResult {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub size: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub date_modified: Option<String>,
+    pub date_modified: Option<u64>,  // Unix epoch seconds, converted from FILETIME by backend
 }
 ```
 
 ### Everything HTTP API
 
 - Add `size_column=1` and `date_modified_column=1` to the query string in `query_http()`.
-- Update `EverythingHttpResult` to deserialize `size` and `date_modified` from the JSON response.
+- Update `EverythingHttpResult` to deserialize `size` (bytes as u64) and `date_modified` (FILETIME as u64) from the JSON response.
+- **Date conversion:** The backend converts FILETIME (100-nanosecond intervals since 1601-01-01) to Unix epoch seconds before populating `SearchResult.date_modified`. The frontend handles relative formatting ("2h ago", "yesterday", etc.).
+- **Size:** Passed as raw bytes (u64). The frontend formats to human-readable (KB, MB, GB).
 - Populate the new fields when building file/directory `SearchResult`s.
 - Non-Everything providers (apps, calculator, system, etc.) pass `None` for both fields.
 
 ### New Tauri Command: `search_table`
 
-- Similar to `search` but requests more results (up to 100) and always includes size/date metadata.
+- Searches **only Files and Directories** (no apps, calculator, system, etc.).
+- Requests more results (up to 100) and always includes size/date metadata.
+- Accepts `sort_by` (string: "name", "path", "size", "date_modified") and `ascending` (bool) parameters so the frontend can request re-sorted results when the user clicks a column header.
+- **Sorting strategy:** The backend re-queries Everything with the requested sort. This ensures the top-100 results are correct for the chosen sort column (frontend-only re-sorting of a date-sorted top-100 would give wrong results for name-sorted top-100).
 - Keeps the normal `search` path lean and fast.
-- The table panel calls `search_table` when it opens, using the current query.
+- The table panel calls `search_table` when it opens (and on each column sort change), using the current query.
 
 ### No new dependencies
 
@@ -107,12 +114,14 @@ Everything needed is already available in the Everything HTTP API response — w
 ### App.tsx Key Handler Changes
 
 - Ctrl+T: toggles `tableOpen`, invokes `search_table` if opening, flips `activePanel` to `"table"`.
-- Tab (when table is open): cycles `activePanel` between `"results"` and `"table"`.
+- Ctrl+Tab (when table is open): cycles `activePanel` between `"results"` and `"table"`.
 - Key routing: `handleKeyDown` checks `activePanel` to decide whether keys go to the result list or the table.
 
 ### Window Resize Logic
 
-The existing `useEffect` that calls `LogicalSize` gets a new branch: if `tableOpen`, set width to ~1200px (capped at 85% of screen width). On close, restore to 600px.
+The existing `useEffect` that calls `LogicalSize` gets a new branch: if `tableOpen`, set width to ~1200px (capped at 85% of screen width, using logical pixels consistent with Tauri's `LogicalSize`). On close, restore to 600px.
+
+**Position tracking:** Before widening, capture the window's current X/Y position into state (`originalWindowPos`). On close, restore that position. Uses Tauri's `outerPosition()` and `setPosition()` APIs.
 
 ### Styling (styles.css)
 
@@ -130,12 +139,18 @@ When the user types while the table is open, results update live:
 - The table re-fetches via `search_table` with the new query.
 - The table stays open and updates in place — no need to close and reopen.
 - If the new query produces zero file/directory results, the table shows an empty state ("No file results") but remains open.
+- **Empty query:** If the user clears the query entirely while the table is open, the table auto-closes and the window restores to normal size. (Empty query shows Frequent items, which don't have table metadata.)
 
 ## Interaction with Existing Features
 
-- **Ctrl+E:** If the table is open, Ctrl+E is a no-op for Files/Directories (table already shows the expanded set). Ctrl+E still works for other categories in the left panel.
-- **Preview from table:** Ctrl+Space opens preview replacing table content. Ctrl+Space again returns to the table.
+- **Ctrl+E:** If the table is open, Ctrl+E to *expand* Files/Directories is a no-op (table already shows the expanded set). Ctrl+E to *collapse* an already-expanded category still works. Ctrl+E still works normally for other categories in the left panel.
+- **Preview from table:** Ctrl+Space opens preview replacing the table panel content (right side only — the left result list stays visible). Ctrl+Space again returns to the table.
 - **Context menu from table:** Shift+Right opens the same context menu, positioned in the table panel area.
+
+## Additional Notes
+
+- **Window transition:** No animation for v1 — the window resizes instantly. Can revisit if it feels jarring.
+- **Status bar:** When the table panel is focused, the status bar shows the full path of the table's selected row. When the result list is focused, it shows the result list's selected subtitle as it does today.
 
 ## Out of Scope (v1)
 
