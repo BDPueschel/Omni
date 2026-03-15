@@ -108,7 +108,19 @@ export function App() {
 
   const expandCategory = useCallback(async () => {
     const cat = getSelectedCategory();
-    if (!cat || cat === "Math" || cat === "URL") return; // these don't expand
+    if (!cat || cat === "Math" || cat === "URL") return;
+
+    // Toggle: if already expanded, collapse back
+    if (expandedCategory === cat) {
+      setExpandedCategory(null);
+      try {
+        const res = await invoke<SearchResult[]>("search", { query });
+        setResults(res);
+      } catch (e) {
+        console.error("Collapse error:", e);
+      }
+      return;
+    }
 
     try {
       const expanded = await invoke<SearchResult[]>("expand_category", {
@@ -116,7 +128,6 @@ export function App() {
         category: cat,
       });
       if (expanded.length > 0) {
-        // Replace results in this category with expanded results
         setResults((prev) => {
           const other = prev.filter((r) => r.category !== cat);
           return [...other, ...expanded];
@@ -126,7 +137,7 @@ export function App() {
     } catch (e) {
       console.error("Expand error:", e);
     }
-  }, [query, getSelectedCategory]);
+  }, [query, getSelectedCategory, expandedCategory]);
 
   const executeContextAction = useCallback(async (actionIndex: number) => {
     const result = flatResults[contextMenuIndex!];
