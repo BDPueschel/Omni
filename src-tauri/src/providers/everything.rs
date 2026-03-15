@@ -15,6 +15,20 @@ pub enum EverythingStatus {
 
 // --- HTTP API response types ---
 
+/// Deserialize a JSON value that may be a number or a string containing a number.
+fn deserialize_string_u64<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::Deserialize;
+    let val: Option<serde_json::Value> = Option::deserialize(deserializer)?;
+    match val {
+        Some(serde_json::Value::Number(n)) => Ok(n.as_u64()),
+        Some(serde_json::Value::String(s)) => Ok(s.parse::<u64>().ok()),
+        _ => Ok(None),
+    }
+}
+
 #[derive(Debug, serde::Deserialize)]
 struct EverythingHttpResult {
     #[serde(rename = "type")]
@@ -22,9 +36,9 @@ struct EverythingHttpResult {
     name: String,
     #[serde(default)]
     path: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_string_u64")]
     size: Option<u64>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_string_u64")]
     date_modified: Option<u64>,
 }
 
