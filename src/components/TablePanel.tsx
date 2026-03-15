@@ -152,7 +152,7 @@ export function TablePanel({ results, selectedIndex, multiSelected, sortColumn, 
       </div>
       {results.length > 0 && (
         <div class="table-footer">
-          {results.length} items \u00b7 page {currentPage}/{totalPages}
+          {results.length} items - page {currentPage}/{totalPages}
         </div>
       )}
     </div>

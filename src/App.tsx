@@ -1203,10 +1203,10 @@ export function App() {
         <div class="status-bar">
           {tableOpen && activePanel === "table"
             ? (tableMultiSelected.size > 0
-                ? `${tableMultiSelected.size + 1} items selected \u00b7 Shift+\u2192 for batch actions`
+                ? `${tableMultiSelected.size + 1} items selected - Shift+\u2192 for batch actions`
                 : tableResults[tableSelectedIndex]?.subtitle || "")
             : multiSelected.size > 0
-              ? `${multiSelected.size + 1} items selected \u00b7 Shift+\u2192 for batch actions`
+              ? `${multiSelected.size + 1} items selected - Shift+\u2192 for batch actions`
               : flatResults[selectedIndex]?.subtitle || ""}
         </div>
       )}
