@@ -76,7 +76,12 @@ export function App() {
     results: results.filter((r) => r.category === cat),
   })).filter((g) => g.results.length > 0);
 
-  const flatResults = grouped.flatMap((g) => g.results);
+  // When table is open, filter Files/Directories from the left panel (they live in the table)
+  const leftGrouped = tableOpen
+    ? grouped.filter(g => g.category !== "Files" && g.category !== "Directories")
+    : grouped;
+
+  const flatResults = leftGrouped.flatMap((g) => g.results);
 
   const fetchTableResults = useCallback(async (q: string, sortBy = "date_modified", asc = false) => {
     if (!q.trim()) return;
@@ -91,60 +96,31 @@ export function App() {
   }, []);
 
   const toggleTable = useCallback(async () => {
-    const hasFileResults = flatResults.some(r => r.category === "Files" || r.category === "Directories");
-    if (!hasFileResults && !tableOpen) return;
-
     if (tableOpen) {
+      // Close table — restore position
       setTableOpen(false);
       setActivePanel("results");
       setTableMultiSelected(new Set());
-      try {
-        const { getCurrentWindow } = await import("@tauri-apps/api/window");
-        const { LogicalSize } = await import("@tauri-apps/api/dpi");
-        const win = getCurrentWindow();
-        const currentSize = await win.innerSize();
-        const scale = window.devicePixelRatio || 1;
-        await win.setSize(new LogicalSize(600, currentSize.height / scale));
-        if (originalWindowPos) {
+      if (originalWindowPos) {
+        try {
+          const { getCurrentWindow } = await import("@tauri-apps/api/window");
           const { LogicalPosition } = await import("@tauri-apps/api/dpi");
+          const win = getCurrentWindow();
           await win.setPosition(new LogicalPosition(originalWindowPos.x, originalWindowPos.y));
           setOriginalWindowPos(null);
+        } catch (e) {
+          console.error("Table close error:", e);
         }
-      } catch (e) {
-        console.error("Table close resize error:", e);
       }
     } else {
-      try {
-        const { getCurrentWindow } = await import("@tauri-apps/api/window");
-        const { LogicalSize, LogicalPosition } = await import("@tauri-apps/api/dpi");
-        const win = getCurrentWindow();
-        const pos = await win.outerPosition();
-        const scale = window.devicePixelRatio || 1;
-        const logicalX = pos.x / scale;
-        const logicalY = pos.y / scale;
-        setOriginalWindowPos({ x: logicalX, y: logicalY });
-
-        const maxW = window.screen.availWidth * 0.85 / scale;
-        const targetW = Math.min(1200, maxW);
-
-        const screenW = window.screen.availWidth / scale;
-        let newX = logicalX;
-        if (logicalX + targetW > screenW) {
-          newX = Math.max(0, screenW - targetW);
-          await win.setPosition(new LogicalPosition(newX, logicalY));
-        }
-
-        const currentSize = await win.innerSize();
-        const currentH = currentSize.height / scale;
-        await win.setSize(new LogicalSize(targetW, currentH));
-      } catch (e) {
-        console.error("Table open resize error:", e);
-      }
+      // Open table — resize effect handles the window sizing
+      const hasFileResults = results.some(r => r.category === "Files" || r.category === "Directories");
+      if (!hasFileResults) return;
       setTableOpen(true);
       setActivePanel("table");
       fetchTableResults(query);
     }
-  }, [tableOpen, flatResults, query, originalWindowPos, fetchTableResults]);
+  }, [tableOpen, results, query, originalWindowPos, fetchTableResults]);
 
   const handleInput = useCallback((value: string) => {
     setQuery(value);
@@ -176,8 +152,17 @@ export function App() {
       try {
         const res = await invoke<SearchResult[]>("search", { query: value });
         setResults(res);
-        if (tableOpen) {
+        // Auto-open table if results contain files/directories
+        const hasFiles = res.some(r => r.category === "Files" || r.category === "Directories");
+        if (hasFiles && !tableOpen) {
+          // Open table without the full toggleTable resize dance — just fetch and show
+          setTableOpen(true);
           fetchTableResults(value);
+        } else if (hasFiles && tableOpen) {
+          fetchTableResults(value);
+        } else if (!hasFiles && tableOpen) {
+          setTableOpen(false);
+          setActivePanel("results");
         }
       } catch (e) {
         console.error("Search error:", e);
@@ -236,14 +221,14 @@ export function App() {
   // Find which category the selected index belongs to
   const getSelectedCategory = useCallback((): string | null => {
     let count = 0;
-    for (const g of grouped) {
+    for (const g of leftGrouped) {
       if (count + g.results.length > selectedIndex) {
         return g.category;
       }
       count += g.results.length;
     }
     return null;
-  }, [grouped, selectedIndex]);
+  }, [leftGrouped, selectedIndex]);
 
   const expandCategory = useCallback(async () => {
     const cat = getSelectedCategory();
@@ -563,7 +548,7 @@ export function App() {
       // Helper: find start/end index of current category group
       const getCategoryBounds = () => {
         let start = 0;
-        for (const g of grouped) {
+        for (const g of leftGrouped) {
           const end = start + g.results.length - 1;
           if (selectedIndex >= start && selectedIndex <= end) {
             return { start, end };
@@ -577,7 +562,7 @@ export function App() {
       const getNextCategoryStart = () => {
         let start = 0;
         let foundCurrent = false;
-        for (const g of grouped) {
+        for (const g of leftGrouped) {
           if (foundCurrent) return start;
           const end = start + g.results.length - 1;
           if (selectedIndex >= start && selectedIndex <= end) {
@@ -591,7 +576,7 @@ export function App() {
       const getPrevCategoryEnd = () => {
         let start = 0;
         let prevEnd = 0;
-        for (const g of grouped) {
+        for (const g of leftGrouped) {
           const end = start + g.results.length - 1;
           if (selectedIndex >= start && selectedIndex <= end) {
             return prevEnd > 0 ? prevEnd : 0;
@@ -731,17 +716,17 @@ export function App() {
             // Normal category jump
             let currentGroup = 0;
             let count = 0;
-            for (const g of grouped) {
+            for (const g of leftGrouped) {
               if (count + g.results.length > selectedIndex) {
-                currentGroup = grouped.indexOf(g);
+                currentGroup = leftGrouped.indexOf(g);
                 break;
               }
               count += g.results.length;
             }
-            const nextGroup = (currentGroup + 1) % grouped.length;
+            const nextGroup = (currentGroup + 1) % leftGrouped.length;
             let nextIndex = 0;
             for (let i = 0; i < nextGroup; i++) {
-              nextIndex += grouped[i].results.length;
+              nextIndex += leftGrouped[i].results.length;
             }
             setSelectedIndex(nextIndex);
           }
@@ -819,7 +804,7 @@ export function App() {
           break;
       }
     },
-    [flatResults, selectedIndex, grouped, executeResult, expandCategory, expandedCategory, query, contextMenuIndex, contextActionIndex, executeContextAction, showHelp, previewData, completionCandidates, completionIndex, multiSelected, tableOpen, activePanel, tableSelectedIndex, tableResults, tableMultiSelected, toggleTable, fetchTableResults]
+    [flatResults, selectedIndex, leftGrouped, executeResult, expandCategory, expandedCategory, query, contextMenuIndex, contextActionIndex, executeContextAction, showHelp, previewData, completionCandidates, completionIndex, multiSelected, tableOpen, activePanel, tableSelectedIndex, tableResults, tableMultiSelected, toggleTable, fetchTableResults]
   );
 
   // Scroll selected item into view with padding for group headers
@@ -866,38 +851,59 @@ export function App() {
   // Resize window — anchor top position, only grow downward
   useEffect(() => {
     (async () => {
-      if (tableOpen) return;
       try {
         const { getCurrentWindow } = await import("@tauri-apps/api/window");
-        const { LogicalSize } = await import("@tauri-apps/api/dpi");
+        const { LogicalSize, LogicalPosition } = await import("@tauri-apps/api/dpi");
         const win = getCurrentWindow();
+        const scale = window.devicePixelRatio || 1;
 
         let targetHeight: number;
         if (previewData) {
           const maxH = window.screen.availHeight * 0.85;
-          targetHeight = Math.min(500, maxH); // preview gets generous height
+          targetHeight = Math.min(500, maxH);
         } else if (showHelp) {
-          targetHeight = 520; // search bar + full help overlay (expanded for all shortcuts)
+          targetHeight = 520;
         } else if (flatResults.length === 0 && !query.trim()) {
-          targetHeight = 52; // no frequent items, just search bar
+          targetHeight = 52;
         } else if (flatResults.length === 0) {
           targetHeight = 110;
         } else {
-          const base = 52 + 44 + 22; // search bar + padding + status bar
-          const groupCost = grouped.length * 38;
+          const base = 52 + 44 + 22;
+          const groupCost = leftGrouped.length * 38;
           const resultCost = flatResults.length * 44;
           targetHeight = base + groupCost + resultCost;
           const maxH = window.screen.availHeight * 0.85;
           targetHeight = Math.min(targetHeight, maxH);
         }
 
-        // Only resize height, don't re-center — keeps search bar anchored
-        await win.setSize(new LogicalSize(600, targetHeight));
+        // Set width based on whether table is open
+        let targetWidth = 600;
+        if (tableOpen) {
+          const maxW = window.screen.availWidth * 0.85 / scale;
+          targetWidth = Math.min(1200, maxW);
+          targetHeight = Math.max(targetHeight, 400); // table needs minimum height
+
+          // Save position if not already saved, and shift left if needed
+          if (!originalWindowPos) {
+            const pos = await win.outerPosition();
+            const logicalX = pos.x / scale;
+            const logicalY = pos.y / scale;
+            setOriginalWindowPos({ x: logicalX, y: logicalY });
+
+            const screenW = window.screen.availWidth / scale;
+            if (logicalX + targetWidth > screenW) {
+              const newX = Math.max(0, screenW - targetWidth);
+              await win.setPosition(new LogicalPosition(newX, logicalY));
+            }
+          }
+        }
+
+        await win.setSize(new LogicalSize(targetWidth, targetHeight));
       } catch (e) {
         console.error(`[Omni resize] ERROR:`, e);
       }
     })();
-  }, [flatResults.length, grouped.length, query, showHelp, previewData, tableOpen]);
+  }, [flatResults.length, leftGrouped.length, query, showHelp, previewData, tableOpen]);
 
   // Listen for backend events
   useEffect(() => {
@@ -938,7 +944,7 @@ export function App() {
       {tableOpen ? (
         <div class="omni-split">
           <div class={`results-container ${activePanel === "results" ? "panel-active" : "panel-inactive"}`}>
-            {grouped.map((group) => {
+            {leftGrouped.map((group) => {
               const startIndex = globalIndex;
               globalIndex += group.results.length;
               return (
@@ -1024,7 +1030,7 @@ export function App() {
         </div>
       ) : flatResults.length > 0 ? (
         <div class="results-container">
-          {grouped.map((group) => {
+          {leftGrouped.map((group) => {
             const startIndex = globalIndex;
             globalIndex += group.results.length;
             return (
