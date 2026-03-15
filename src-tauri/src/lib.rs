@@ -3,6 +3,7 @@ pub mod config;
 pub mod icons;
 pub mod providers;
 pub mod search;
+pub mod usage;
 
 use config::OmniConfig;
 use providers::apps::AppProvider;
@@ -126,6 +127,9 @@ pub fn run() {
             search::execute_action,
             search::kill_process,
             search::hide_window,
+            search::record_selection,
+            search::get_frequent_items,
+            search::clear_usage_data,
             icons::get_icon,
         ])
         .run(tauri::generate_context!())

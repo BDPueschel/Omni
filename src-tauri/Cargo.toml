@@ -35,6 +35,7 @@ windows = { version = "0.61", features = [
 ] }
 image = { version = "0.25", default-features = false, features = ["png"] }
 base64 = "0.22"
+rusqlite = { version = "0.34", features = ["bundled"] }
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

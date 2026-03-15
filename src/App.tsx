@@ -13,7 +13,7 @@ interface SearchResult {
   icon: string;
 }
 
-const CATEGORY_ORDER = ["Math", "Color", "Apps", "System", "Processes", "Files", "Directories", "URL", "Web"];
+const CATEGORY_ORDER = ["Frequent", "Math", "Color", "Apps", "System", "Processes", "Files", "Directories", "URL", "Web"];
 
 export function App() {
   const [query, setQuery] = useState("");
@@ -45,7 +45,10 @@ export function App() {
     }
 
     if (!value.trim()) {
-      setResults([]);
+      // Show frequent items when query is cleared
+      invoke<SearchResult[]>("get_frequent_items")
+        .then((frequent) => setResults(frequent.length > 0 ? frequent : []))
+        .catch(() => setResults([]));
       return;
     }
 
@@ -89,6 +92,14 @@ export function App() {
       } catch (e) {
         console.error("Action error:", e);
       }
+
+      // Record usage for ranking boost
+      invoke("record_selection", {
+        query,
+        resultPath: result.subtitle,
+        category: result.category,
+        title: result.title,
+      });
 
       // Hide window after action
       const { getCurrentWindow } = await import("@tauri-apps/api/window");
@@ -377,7 +388,7 @@ export function App() {
         if (showHelp) {
           targetHeight = 420; // search bar + full help overlay
         } else if (flatResults.length === 0 && !query.trim()) {
-          targetHeight = 52;
+          targetHeight = 52; // no frequent items, just search bar
         } else if (flatResults.length === 0) {
           targetHeight = 110;
         } else {
@@ -404,8 +415,16 @@ export function App() {
       setResults([]);
       setSelectedIndex(0);
     });
-    const unlistenShown = listen("window-shown", () => {
+    const unlistenShown = listen("window-shown", async () => {
       invoke("refresh_apps");
+      try {
+        const frequent = await invoke<SearchResult[]>("get_frequent_items");
+        if (frequent.length > 0) {
+          setResults(frequent);
+        }
+      } catch (e) {
+        console.error("Frequent items error:", e);
+      }
     });
     return () => {
       unlistenClear.then((fn) => fn());

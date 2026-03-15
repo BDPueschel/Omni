@@ -9,7 +9,7 @@ use crate::providers::system::SystemProvider;
 use crate::providers::units::UnitProvider;
 use crate::providers::url::UrlProvider;
 use crate::providers::web_search::WebSearchProvider;
-use crate::providers::SearchResult;
+use crate::providers::{ResultAction, SearchResult};
 use std::sync::Mutex;
 use tauri::State;
 
@@ -88,6 +88,25 @@ pub fn search_query(
     // Web search fallback (suppress if we have a precise match)
     if !has_math && !has_url && !has_units && !has_currency && !has_color {
         all_results.extend(WebSearchProvider::evaluate(query, search_engine));
+    }
+
+    // Usage-based boosting — move frequently selected results to top of their category
+    let usage = crate::usage::get_usage(query);
+    if !usage.is_empty() {
+        let usage_paths: std::collections::HashSet<String> =
+            usage.iter().map(|(path, _, _, _)| path.clone()).collect();
+
+        // Partition results: boosted first, then the rest, within each category
+        all_results.sort_by(|a, b| {
+            // Same category? Sort boosted items first
+            if a.category == b.category {
+                let a_boosted = usage_paths.contains(&a.subtitle);
+                let b_boosted = usage_paths.contains(&b.subtitle);
+                b_boosted.cmp(&a_boosted)
+            } else {
+                std::cmp::Ordering::Equal // preserve category order
+            }
+        });
     }
 
     all_results
@@ -295,6 +314,42 @@ fn execute_system_command(command: &str) -> Result<(), String> {
         _ => return Err(format!("Unknown system command: {}", command)),
     }
     Ok(())
+}
+
+#[tauri::command]
+pub fn record_selection(query: String, result_path: String, category: String, title: String) {
+    crate::usage::record_usage(&query, &result_path, &category, &title);
+}
+
+#[tauri::command]
+pub fn get_frequent_items() -> Vec<SearchResult> {
+    let frequent = crate::usage::get_frequent(5);
+    frequent
+        .into_iter()
+        .map(|(path, category, title, count)| {
+            let action = if category == "Apps" {
+                ResultAction::LaunchApp { path: path.clone() }
+            } else {
+                ResultAction::OpenFile { path: path.clone() }
+            };
+            SearchResult {
+                category: "Frequent".to_string(),
+                title,
+                subtitle: format!("{} — used {} times", path, count),
+                action,
+                icon: if category == "Apps" {
+                    "app".to_string()
+                } else {
+                    "file".to_string()
+                },
+            }
+        })
+        .collect()
+}
+
+#[tauri::command]
+pub fn clear_usage_data() {
+    crate::usage::clear_usage();
 }
 
 /// Dry-run version for testing — validates the command name without executing.
