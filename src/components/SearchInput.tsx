@@ -18,7 +18,9 @@ export function SearchInput({ value, onInput, onKeyDown }: Props) {
   // Re-focus when window is shown via Alt+Space
   useEffect(() => {
     const unlisten = listen("window-shown", () => {
-      setTimeout(() => inputRef.current?.focus(), 50);
+      // Focus immediately, then again after a tick in case Tauri's focus isn't ready
+      inputRef.current?.focus();
+      requestAnimationFrame(() => inputRef.current?.focus());
     });
     return () => { unlisten.then(fn => fn()); };
   }, []);
@@ -30,6 +32,7 @@ export function SearchInput({ value, onInput, onKeyDown }: Props) {
         ref={inputRef}
         type="text"
         class="omni-input"
+        autoFocus
         placeholder="Search files, apps, or type a command..."
         value={value}
         onInput={(e) => onInput((e.target as HTMLInputElement).value)}
