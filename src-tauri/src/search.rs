@@ -149,8 +149,9 @@ pub fn open_in_vscode(path: &str) -> Result<(), String> {
             .to_string_lossy()
             .to_string()
     };
-    std::process::Command::new("code")
-        .arg(&target)
+    // Try cmd /C code (works with the PATH shell wrapper)
+    std::process::Command::new("cmd")
+        .args(["/C", "code", &target])
         .spawn()
         .map_err(|e| e.to_string())?;
     Ok(())

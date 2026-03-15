@@ -173,15 +173,58 @@ export function App() {
         }
       }
 
+      // Helper: find start/end index of current category group
+      const getCategoryBounds = () => {
+        let start = 0;
+        for (const g of grouped) {
+          const end = start + g.results.length - 1;
+          if (selectedIndex >= start && selectedIndex <= end) {
+            return { start, end };
+          }
+          start = end + 1;
+        }
+        return { start: 0, end: flatResults.length - 1 };
+      };
+
       // Normal result navigation
       switch (e.key) {
         case "ArrowDown":
           e.preventDefault();
-          setSelectedIndex((i) => Math.min(i + 1, flatResults.length - 1));
+          if (e.ctrlKey) {
+            // Ctrl+Down: jump to end of current category
+            setSelectedIndex(getCategoryBounds().end);
+          } else {
+            setSelectedIndex((i) => Math.min(i + 1, flatResults.length - 1));
+          }
           break;
         case "ArrowUp":
           e.preventDefault();
-          setSelectedIndex((i) => Math.max(i - 1, 0));
+          if (e.ctrlKey) {
+            // Ctrl+Up: jump to start of current category
+            setSelectedIndex(getCategoryBounds().start);
+          } else {
+            setSelectedIndex((i) => Math.max(i - 1, 0));
+          }
+          break;
+        case "Home":
+          // Absolute start
+          e.preventDefault();
+          setSelectedIndex(0);
+          break;
+        case "End":
+          // Absolute end
+          e.preventDefault();
+          setSelectedIndex(flatResults.length - 1);
+          break;
+        case "PageDown":
+          // Same as Ctrl+Down: jump to end of current category
+          e.preventDefault();
+          setSelectedIndex(getCategoryBounds().end);
+          break;
+        case "PageUp":
+          // Same as Ctrl+Up: jump to start of current category
+          e.preventDefault();
+          setSelectedIndex(getCategoryBounds().start);
           break;
         case "ArrowRight":
           // Open context menu for selected result
