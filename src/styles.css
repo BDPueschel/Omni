@@ -81,6 +81,10 @@ html, body {
   background: transparent;
 }
 
+.result-group:first-child {
+  margin-top: 8px;
+}
+
 .result-group {
   margin: 4px 12px;
   background: rgba(255, 255, 255, 0.03);
