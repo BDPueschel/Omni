@@ -953,8 +953,6 @@ export function App() {
       }
     });
     const unlistenSelect = listen("select-query", () => {
-      // Alt+Space when already visible: select all text in search bar.
-      // This fires on key Release so Alt is no longer held — no ding.
       const input = document.querySelector(".omni-input") as HTMLInputElement | null;
       if (input) {
         input.focus();
@@ -962,10 +960,23 @@ export function App() {
       }
       setActivePanel("results");
     });
+
+    // Suppress Windows alt-menu mode: when Alt is pressed/released alone (or
+    // as part of Alt+Space), Windows enters menu-accelerator mode and dings on
+    // the next keystroke. Preventing default on Alt keydown cancels this.
+    const suppressAltMenu = (e: KeyboardEvent) => {
+      if (e.key === "Alt" || e.key === "Meta") {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener("keydown", suppressAltMenu, true);
+    window.addEventListener("keyup", suppressAltMenu, true);
     return () => {
       unlistenClear.then((fn) => fn());
       unlistenShown.then((fn) => fn());
       unlistenSelect.then((fn) => fn());
+      window.removeEventListener("keydown", suppressAltMenu, true);
+      window.removeEventListener("keyup", suppressAltMenu, true);
     };
   }, []);
 
