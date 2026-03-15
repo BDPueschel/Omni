@@ -197,13 +197,62 @@ pub fn open_in_vscode(path: &str) -> Result<(), String> {
             .spawn()
             .map_err(|e| e.to_string())?;
     } else {
-        // Open file in VS Code (also opens its parent folder as workspace)
-        let dir = p.parent().unwrap_or(std::path::Path::new("C:\\"));
+        // Use code --open-url with vscode:// URI to respect workbench.editorAssociations
+        // (passing a bare file path to `code` forces text editor mode and pollutes the editor override cache)
+        let uri = format!("vscode://file/{}", path.replace('\\', "/"));
         std::process::Command::new("cmd")
-            .args(["/C", "code", &dir.to_string_lossy(), path])
+            .args(["/C", "code", "--open-url", &uri])
             .spawn()
             .map_err(|e| e.to_string())?;
     }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn open_with(path: &str) -> Result<(), String> {
+    std::process::Command::new("rundll32.exe")
+        .args(["shell32.dll,OpenAs_RunDLL", path])
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn delete_file(path: &str) -> Result<(), String> {
+    let ps_cmd = format!(
+        "Add-Type -AssemblyName Microsoft.VisualBasic; [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile('{}', 'OnlyErrorDialogs', 'SendToRecycleBin')",
+        path.replace("'", "''")
+    );
+    std::process::Command::new("powershell")
+        .args(["-Command", &ps_cmd])
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn copy_file_to(path: &str) -> Result<(), String> {
+    let ps_cmd = format!(
+        r#"Add-Type -AssemblyName System.Windows.Forms; $f = New-Object System.Windows.Forms.FolderBrowserDialog; $f.Description = 'Copy to...'; if ($f.ShowDialog() -eq 'OK') {{ Copy-Item '{}' -Destination $f.SelectedPath -Force }}"#,
+        path.replace("'", "''")
+    );
+    std::process::Command::new("powershell")
+        .args(["-Command", &ps_cmd])
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn move_file_to(path: &str) -> Result<(), String> {
+    let ps_cmd = format!(
+        r#"Add-Type -AssemblyName System.Windows.Forms; $f = New-Object System.Windows.Forms.FolderBrowserDialog; $f.Description = 'Move to...'; if ($f.ShowDialog() -eq 'OK') {{ Move-Item '{}' -Destination $f.SelectedPath -Force }}"#,
+        path.replace("'", "''")
+    );
+    std::process::Command::new("powershell")
+        .args(["-Command", &ps_cmd])
+        .spawn()
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 

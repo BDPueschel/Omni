@@ -43,6 +43,33 @@ function getActions(result: SearchResult): ContextAction[] {
     });
   }
 
+  if (result.category === "Files") {
+    actions.push({
+      label: "Open with...",
+      handler: async () => { await invoke("open_with", { path }); },
+    });
+  }
+
+  if (result.category === "Files" || result.category === "Directories") {
+    actions.push({
+      label: "Copy to...",
+      handler: async () => { await invoke("copy_file_to", { path }); },
+    });
+    actions.push({
+      label: "Move to...",
+      handler: async () => { await invoke("move_file_to", { path }); },
+    });
+    actions.push({
+      label: "Delete (recycle bin)",
+      handler: async () => {
+        const confirmed = window.confirm(`Move "${result.title}" to recycle bin?`);
+        if (confirmed) {
+          await invoke("delete_file", { path });
+        }
+      },
+    });
+  }
+
   if (result.category === "Apps") {
     actions.push({
       label: "Run as administrator",

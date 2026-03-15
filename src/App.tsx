@@ -590,6 +590,7 @@ export function App() {
             <div class="help-row"><kbd>foo | bar</kbd><span>OR — match either term</span></div>
             <div class="help-row"><kbd>!node_modules</kbd><span>NOT — exclude term</span></div>
             <div class="help-row"><kbd>foo bar</kbd><span>Fuzzy fragments (matches *foo*bar*)</span></div>
+            <div class="help-row"><kbd>regex:pattern</kbd><span>Regex search (also r:)</span></div>
           </div>
         </div>
       )}

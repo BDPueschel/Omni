@@ -141,15 +141,36 @@ impl EverythingProvider {
             || q.contains("regex:") || q.contains("!")
             || q.contains("parent:") || q.contains("startwith:")
             || q.contains("endwith:")
+            || q.starts_with("r:")
     }
 
-    /// Build es.exe args for a query, handling path context and raw operators.
+    /// Check if query is a regex search (regex: or r: prefix).
+    /// Returns Some(pattern) with the prefix stripped, or None.
+    fn parse_regex_prefix(query: &str) -> Option<String> {
+        let q = query.trim();
+        if let Some(rest) = q.strip_prefix("regex:") {
+            Some(rest.trim().to_string())
+        } else if let Some(rest) = q.strip_prefix("r:") {
+            Some(rest.trim().to_string())
+        } else {
+            None
+        }
+    }
+
+    /// Build es.exe args for a query, handling path context, regex, and raw operators.
     fn build_search_args(query: &str, max_results: usize, extra_flags: &[&str]) -> Vec<String> {
         let max_str = max_results.to_string();
         let mut args: Vec<String> = vec!["-n".to_string(), max_str];
 
         for flag in extra_flags {
             args.push(flag.to_string());
+        }
+
+        // Regex mode: strip prefix, pass -r flag and raw pattern
+        if let Some(pattern) = Self::parse_regex_prefix(query) {
+            args.push("-r".to_string());
+            args.push(pattern);
+            return args;
         }
 
         if let Some((path, remainder)) = Self::parse_path_context(query) {
