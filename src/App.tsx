@@ -552,6 +552,9 @@ export function App() {
               setTableMultiSelected(new Set());
             }
             return;
+          case "f": case "F":
+            if (e.ctrlKey) e.preventDefault(); // suppress Chromium "Find in page"
+            return;
           default:
             return;
         }
@@ -771,6 +774,12 @@ export function App() {
           if (e.ctrlKey) {
             e.preventDefault();
             setShowHelp((v) => !v);
+          }
+          break;
+        case "f":
+        case "F":
+          if (e.ctrlKey) {
+            e.preventDefault(); // suppress Chromium "Find in page"
           }
           break;
         case " ":
