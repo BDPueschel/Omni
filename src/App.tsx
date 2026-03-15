@@ -466,7 +466,7 @@ export function App() {
 
         let targetHeight: number;
         if (previewData) {
-          const maxH = window.screen.availHeight * 0.75;
+          const maxH = window.screen.availHeight * 0.85;
           targetHeight = Math.min(500, maxH); // preview gets generous height
         } else if (showHelp) {
           targetHeight = 420; // search bar + full help overlay
@@ -479,7 +479,7 @@ export function App() {
           const groupCost = grouped.length * 38;
           const resultCost = flatResults.length * 44;
           targetHeight = base + groupCost + resultCost;
-          const maxH = window.screen.availHeight * 0.75;
+          const maxH = window.screen.availHeight * 0.85;
           targetHeight = Math.min(targetHeight, maxH);
         }
 
