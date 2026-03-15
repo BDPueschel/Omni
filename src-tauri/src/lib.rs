@@ -124,6 +124,7 @@ pub fn run() {
             search::get_config,
             search::save_config,
             search::execute_action,
+            search::kill_process,
             search::hide_window,
             icons::get_icon,
         ])

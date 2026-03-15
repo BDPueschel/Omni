@@ -13,7 +13,7 @@ interface SearchResult {
   icon: string;
 }
 
-const CATEGORY_ORDER = ["Math", "Apps", "System", "Files", "Directories", "URL", "Web"];
+const CATEGORY_ORDER = ["Math", "Apps", "System", "Processes", "Files", "Directories", "URL", "Web"];
 
 export function App() {
   const [query, setQuery] = useState("");
@@ -69,6 +69,11 @@ export function App() {
       if (result.action.type === "system_command" &&
           DESTRUCTIVE_COMMANDS.includes(result.action.command)) {
         const confirmed = window.confirm(`Are you sure you want to ${result.title.toLowerCase()}?`);
+        if (!confirmed) return;
+      }
+
+      if (result.action.type === "kill_process") {
+        const confirmed = window.confirm(`Kill process "${result.action.name}" (PID ${result.action.pid})?`);
         if (!confirmed) return;
       }
 

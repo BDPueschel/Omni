@@ -2,6 +2,7 @@ pub mod apps;
 pub mod currency;
 pub mod everything;
 pub mod math;
+pub mod process;
 pub mod system;
 pub mod units;
 pub mod url;
@@ -33,4 +34,6 @@ pub enum ResultAction {
     SystemCommand { command: String },
     #[serde(rename = "web_search")]
     WebSearch { url: String },
+    #[serde(rename = "kill_process")]
+    KillProcess { pid: u32, name: String },
 }

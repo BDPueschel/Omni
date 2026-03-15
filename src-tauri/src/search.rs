@@ -3,6 +3,7 @@ use crate::providers::apps::{AppEntry, AppProvider};
 use crate::providers::currency::CurrencyProvider;
 use crate::providers::everything::EverythingProvider;
 use crate::providers::math::MathProvider;
+use crate::providers::process::ProcessProvider;
 use crate::providers::system::SystemProvider;
 use crate::providers::units::UnitProvider;
 use crate::providers::url::UrlProvider;
@@ -66,6 +67,12 @@ pub fn search_query(
     let system_results = SystemProvider::evaluate(query);
     all_results.extend(system_results.into_iter().take(max));
 
+    // Process search (only when query starts with "kill ")
+    if query.to_lowercase().starts_with("kill ") {
+        let process_results = ProcessProvider::evaluate(query);
+        all_results.extend(process_results.into_iter().take(max));
+    }
+
     // Everything file search (files only, no directories)
     all_results.extend(EverythingProvider::search_files(query, max));
 
@@ -115,6 +122,7 @@ pub fn expand_category(query: &str, category: &str, state: State<AppState>) -> V
         "Files" => EverythingProvider::search_files(query, max),
         "Directories" => EverythingProvider::search_dirs(query, max),
         "System" => SystemProvider::evaluate(query),
+        "Processes" => ProcessProvider::evaluate(query),
         "Web" => WebSearchProvider::evaluate(query, &config.search_engine),
         _ => vec![],
     }
@@ -214,7 +222,23 @@ pub fn execute_action(action: crate::providers::ResultAction) -> Result<(), Stri
         crate::providers::ResultAction::SystemCommand { command } => {
             execute_system_command(&command)
         }
+        crate::providers::ResultAction::KillProcess { pid, name: _ } => {
+            std::process::Command::new("taskkill")
+                .args(["/PID", &pid.to_string(), "/F"])
+                .output()
+                .map_err(|e| e.to_string())?;
+            Ok(())
+        }
     }
+}
+
+#[tauri::command]
+pub fn kill_process(pid: u32, _name: String) -> Result<(), String> {
+    std::process::Command::new("taskkill")
+        .args(["/PID", &pid.to_string(), "/F"])
+        .output()
+        .map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 #[tauri::command]
