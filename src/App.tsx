@@ -250,6 +250,12 @@ export function App() {
             e.preventDefault();
             previewContent?.scrollBy({ top: -(previewContent.clientHeight * 0.8), behavior: "smooth" });
             return;
+          case " ":
+            if (e.ctrlKey) {
+              e.preventDefault();
+              setPreviewData(null);
+            }
+            return;
           default:
             return;
         }
@@ -519,11 +525,15 @@ export function App() {
         case " ":
           if (e.ctrlKey && flatResults.length > 0) {
             e.preventDefault();
-            const result = flatResults[selectedIndex];
-            if (result && (result.category === "Files" || result.category === "Directories")) {
-              invoke<FilePreview>("preview_file", { path: result.subtitle })
-                .then((preview) => setPreviewData(preview))
-                .catch((err) => console.error("Preview error:", err));
+            if (previewData) {
+              setPreviewData(null);
+            } else {
+              const result = flatResults[selectedIndex];
+              if (result && (result.category === "Files" || result.category === "Directories")) {
+                invoke<FilePreview>("preview_file", { path: result.subtitle })
+                  .then((preview) => setPreviewData(preview))
+                  .catch((err) => console.error("Preview error:", err));
+              }
             }
           }
           break;
