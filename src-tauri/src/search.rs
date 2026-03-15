@@ -182,7 +182,7 @@ pub fn search_table(
     sort_by: &str,
     ascending: bool,
 ) -> Vec<SearchResult> {
-    search_table_query(query, 100, sort_by, ascending)
+    search_table_query(query, 1000, sort_by, ascending)
 }
 
 #[tauri::command]

@@ -51,11 +51,11 @@ export function TablePanel({ results, selectedIndex, multiSelected, sortColumn, 
   return (
     <div class="table-panel">
       <div class="table-header">
-        <div class="table-col col-name" onClick={() => handleHeaderClick("name")}>
-          Name {sortIndicator("name")}
-        </div>
         <div class="table-col col-type" onClick={() => handleHeaderClick("type")}>
           Type {sortIndicator("type")}
+        </div>
+        <div class="table-col col-name" onClick={() => handleHeaderClick("name")}>
+          Name {sortIndicator("name")}
         </div>
         <div class="table-col col-path" onClick={() => handleHeaderClick("path")}>
           Path {sortIndicator("path")}
@@ -78,11 +78,11 @@ export function TablePanel({ results, selectedIndex, multiSelected, sortColumn, 
               onClick={() => onSelect(i)}
               onDblClick={() => onExecute(i)}
             >
+              <div class="table-col col-type">{getExtension(r.title)}</div>
               <div class="table-col col-name">
                 <span class="table-icon">{getFileIcon(r.title)}</span>
                 {r.title}
               </div>
-              <div class="table-col col-type">{getExtension(r.title)}</div>
               <div class="table-col col-path">{getParentPath(r.subtitle)}</div>
               <div class="table-col col-size">{formatSize(r.size)}</div>
               <div class="table-col col-date">{formatDate(r.date_modified)}</div>

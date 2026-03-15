@@ -534,7 +534,7 @@ export function App() {
           case "1": case "2": case "3": case "4": case "5":
             if (e.ctrlKey) {
               e.preventDefault();
-              const cols: Array<SortColumn> = ["name", "type", "path", "size", "date_modified"];
+              const cols: Array<SortColumn> = ["type", "name", "path", "size", "date_modified"];
               const col = cols[parseInt(e.key) - 1];
               // Toggle direction if same column, else use default for that column
               const asc = col === tableSortColumn
