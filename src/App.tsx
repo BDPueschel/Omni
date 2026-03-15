@@ -493,6 +493,12 @@ export function App() {
               fetchTableResults(query, col, asc);
             }
             return;
+          case "t": case "T":
+            if (e.ctrlKey) {
+              e.preventDefault();
+              toggleTable();
+            }
+            return;
           default:
             return;
         }
