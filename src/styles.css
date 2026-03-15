@@ -64,7 +64,7 @@ html, body {
 .search-icon-img {
   width: 24px;
   height: 24px;
-  margin: -1px 10px 0 12px;
+  margin: -3px 10px 0 12px;
   flex-shrink: 0;
 }
 
