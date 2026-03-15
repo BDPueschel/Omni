@@ -918,7 +918,7 @@ export function App() {
           const maxH = window.screen.availHeight * 0.85;
           targetHeight = Math.min(500, maxH);
         } else if (showHelp) {
-          targetHeight = 560;
+          targetHeight = 620;
         } else if (flatResults.length === 0 && !query.trim()) {
           targetHeight = 52;
         } else if (flatResults.length === 0) {
@@ -1165,37 +1165,44 @@ export function App() {
               <div class="help-section-title">Navigation</div>
               <div class="help-row"><kbd>↑ ↓</kbd><span>Move between results</span></div>
               <div class="help-row"><kbd>Tab</kbd><span>Jump to next category</span></div>
-              <div class="help-row"><kbd>Ctrl+↑</kbd><span>Category start, then prev</span></div>
-              <div class="help-row"><kbd>Ctrl+↓</kbd><span>Category end, then next</span></div>
-              <div class="help-row"><kbd>Home</kbd><span>First result</span></div>
-              <div class="help-row"><kbd>End</kbd><span>Last result</span></div>
+              <div class="help-row"><kbd>Ctrl+↑ ↓</kbd><span>Category start/end, then jump</span></div>
+              <div class="help-row"><kbd>Home / End</kbd><span>First / last result</span></div>
               <div class="help-row"><kbd>PgUp/PgDn</kbd><span>Category bounds</span></div>
-              <div class="help-row"><kbd>Shift+↑↓</kbd><span>Multi-select items</span></div>
+              <div class="help-row"><kbd>Shift+↑ ↓</kbd><span>Multi-select items</span></div>
             </div>
             <div class="help-section">
               <div class="help-section-title">Actions</div>
               <div class="help-row"><kbd>Enter</kbd><span>Open / execute</span></div>
               <div class="help-row"><kbd>Shift+→</kbd><span>Context menu</span></div>
               <div class="help-row"><kbd>Shift+←</kbd><span>Close context menu</span></div>
-              <div class="help-row"><kbd>Ctrl+C</kbd><span>Copy path of selected result</span></div>
-              <div class="help-row"><kbd>Ctrl+E</kbd><span>Expand category (50 results)</span></div>
-              <div class="help-row"><kbd>Ctrl+Space</kbd><span>Preview file (↑↓ scroll, PgUp/Dn page)</span></div>
+              <div class="help-row"><kbd>Ctrl+C</kbd><span>Copy path</span></div>
+              <div class="help-row"><kbd>Ctrl+E</kbd><span>Expand category</span></div>
+              <div class="help-row"><kbd>Ctrl+Space</kbd><span>Preview file</span></div>
               <div class="help-row"><kbd>Escape</kbd><span>Collapse / hide</span></div>
-              <div class="help-row"><kbd>Ctrl+T</kbd><span>Table view (file columns)</span></div>
-              <div class="help-row"><kbd>Ctrl+1-5</kbd><span>Sort table by column</span></div>
-              <div class="help-row"><kbd>Ctrl+Shift+←→</kbd><span>Reorder table columns</span></div>
               <div class="help-row"><kbd>Ctrl+H</kbd><span>Toggle this help</span></div>
             </div>
           </div>
-          <div class="help-section" style="margin-top: 10px;">
-            <div class="help-section-title">Search Syntax</div>
-            <div class="help-row"><kbd>C:\path\</kbd><span>Scope search to a directory</span></div>
-            <div class="help-row"><kbd>F:\docs\report</kbd><span>Search "report" in F:\docs\</span></div>
-            <div class="help-row"><kbd>*.rs</kbd><span>Wildcard extension match</span></div>
-            <div class="help-row"><kbd>foo | bar</kbd><span>OR — match either term</span></div>
-            <div class="help-row"><kbd>!node_modules</kbd><span>NOT — exclude term</span></div>
-            <div class="help-row"><kbd>foo bar</kbd><span>Fuzzy fragments (matches *foo*bar*)</span></div>
-            <div class="help-row"><kbd>regex:pattern</kbd><span>Regex search (also r:)</span></div>
+          <div class="help-grid" style="margin-top: 10px;">
+            <div class="help-section">
+              <div class="help-section-title">File Browser</div>
+              <div class="help-row"><kbd>Ctrl+T</kbd><span>Toggle file browser panel</span></div>
+              <div class="help-row"><kbd>Ctrl+→</kbd><span>Jump to file browser</span></div>
+              <div class="help-row"><kbd>Ctrl+←</kbd><span>Jump back to results</span></div>
+              <div class="help-row"><kbd>Ctrl+Tab</kbd><span>Switch panels</span></div>
+              <div class="help-row"><kbd>Ctrl+↑ ↓</kbd><span>Page jump in table</span></div>
+              <div class="help-row"><kbd>Ctrl+1-5</kbd><span>Sort by column (toggles direction)</span></div>
+              <div class="help-row"><kbd>Ctrl+Shift+←→</kbd><span>Reorder columns</span></div>
+              <div class="help-row"><kbd>Drag header</kbd><span>Reorder columns (mouse)</span></div>
+            </div>
+            <div class="help-section">
+              <div class="help-section-title">Search Syntax</div>
+              <div class="help-row"><kbd>C:\path\</kbd><span>Scope to directory</span></div>
+              <div class="help-row"><kbd>*.rs</kbd><span>Wildcard extension</span></div>
+              <div class="help-row"><kbd>foo | bar</kbd><span>OR - match either</span></div>
+              <div class="help-row"><kbd>!node_modules</kbd><span>NOT - exclude term</span></div>
+              <div class="help-row"><kbd>foo bar</kbd><span>Fuzzy fragments</span></div>
+              <div class="help-row"><kbd>regex:pattern</kbd><span>Regex search (also r:)</span></div>
+            </div>
           </div>
         </div>
       )}
