@@ -68,6 +68,7 @@ export function App() {
   const [tableMultiSelected, setTableMultiSelected] = useState<Set<number>>(new Set());
   const [tableSortColumn, setTableSortColumn] = useState<SortColumn>("date_modified");
   const [tableSortAscending, setTableSortAscending] = useState(false);
+  const [tableContextResult, setTableContextResult] = useState<SearchResult | null>(null);
   const [originalWindowPos, setOriginalWindowPos] = useState<{ x: number; y: number } | null>(null);
   const debounceRef = useRef<number | null>(null);
 
@@ -335,7 +336,8 @@ export function App() {
       // Context menu is open — handle its navigation
       if (contextMenuIndex !== null) {
         const isBatch = contextMenuIndex === -1;
-        const result = isBatch ? null : flatResults[contextMenuIndex];
+        const isTableContext = contextMenuIndex === -2;
+        const result = isTableContext ? tableContextResult : (isBatch ? null : flatResults[contextMenuIndex]);
         const actionCount = isBatch ? 5 : (result ? getActions(result).length : 0);
 
         switch (e.key) {
@@ -370,6 +372,14 @@ export function App() {
               setContextMenuIndex(null);
               setContextActionIndex(0);
               setMultiSelected(new Set());
+            } else if (isTableContext && tableContextResult) {
+              const actions = getActions(tableContextResult);
+              if (contextActionIndex >= 0 && contextActionIndex < actions.length) {
+                actions[contextActionIndex].handler();
+              }
+              setContextMenuIndex(null);
+              setContextActionIndex(0);
+              setTableContextResult(null);
             } else {
               executeContextAction(contextActionIndex);
             }
@@ -379,12 +389,14 @@ export function App() {
               e.preventDefault();
               setContextMenuIndex(null);
               setContextActionIndex(0);
+              setTableContextResult(null);
             }
             return;
           case "Escape":
             e.preventDefault();
             setContextMenuIndex(null);
             setContextActionIndex(0);
+            setTableContextResult(null);
             return;
           default:
             return;
@@ -474,12 +486,18 @@ export function App() {
               e.preventDefault();
               const tr = tableResults[tableSelectedIndex];
               if (tr) {
-                const flatIdx = flatResults.findIndex(r => r.subtitle === tr.subtitle);
-                if (flatIdx >= 0) {
-                  setContextMenuIndex(flatIdx);
-                  setContextActionIndex(0);
-                }
+                setTableContextResult(tr as SearchResult);
+                setContextMenuIndex(-2); // -2 signals table context menu
+                setContextActionIndex(0);
               }
+            }
+            return;
+          case "ArrowLeft":
+            if (e.ctrlKey) {
+              // Ctrl+Left: jump focus back to result list
+              e.preventDefault();
+              setActivePanel("results");
+              setTableMultiSelected(new Set());
             }
             return;
           case " ":
@@ -667,6 +685,11 @@ export function App() {
                 setContextActionIndex(0);
               }
             }
+          } else if (e.ctrlKey && tableOpen) {
+            // Ctrl+Right: jump focus to table panel
+            e.preventDefault();
+            setActivePanel("table");
+            setMultiSelected(new Set());
           }
           break;
         case "Enter":
@@ -929,9 +952,19 @@ export function App() {
         console.error("Frequent items error:", e);
       }
     });
+    const unlistenSelect = listen("select-query", () => {
+      // Alt+Space when already visible: select all text in search bar and focus it
+      const input = document.querySelector(".omni-input") as HTMLInputElement | null;
+      if (input) {
+        input.select();
+        input.focus();
+      }
+      setActivePanel("results");
+    });
     return () => {
       unlistenClear.then((fn) => fn());
       unlistenShown.then((fn) => fn());
+      unlistenSelect.then((fn) => fn());
     };
   }, []);
 
@@ -968,6 +1001,22 @@ export function App() {
             {previewData ? (
               <div class="results-container" style={{ flex: 1 }}>
                 <PreviewPanel preview={previewData} />
+              </div>
+            ) : contextMenuIndex === -2 && tableContextResult ? (
+              <div class="results-container" style={{ flex: 1 }}>
+                <ContextMenu
+                  result={tableContextResult}
+                  selectedAction={contextActionIndex}
+                  onExecute={(actionIndex: number) => {
+                    const actions = getActions(tableContextResult);
+                    if (actionIndex >= 0 && actionIndex < actions.length) {
+                      actions[actionIndex].handler();
+                    }
+                    setContextMenuIndex(null);
+                    setContextActionIndex(0);
+                    setTableContextResult(null);
+                  }}
+                />
               </div>
             ) : (
               <TablePanel
