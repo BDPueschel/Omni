@@ -135,6 +135,21 @@ export function App() {
     el?.scrollIntoView({ block: "nearest" });
   }, [selectedIndex]);
 
+  // Resize window to fit content — compact when empty, full when results
+  useEffect(() => {
+    const hasContent = flatResults.length > 0 || query.trim();
+    (async () => {
+      const { getCurrentWindow } = await import("@tauri-apps/api/window");
+      const { LogicalSize } = await import("@tauri-apps/api/dpi");
+      const win = getCurrentWindow();
+      if (hasContent) {
+        await win.setSize(new LogicalSize(600, 500));
+      } else {
+        await win.setSize(new LogicalSize(600, 62));
+      }
+    })();
+  }, [flatResults.length, query]);
+
   // Listen for backend events
   useEffect(() => {
     const unlistenClear = listen("clear-query", () => {
