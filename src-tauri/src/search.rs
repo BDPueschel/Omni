@@ -140,20 +140,21 @@ pub fn open_in_terminal(path: &str) -> Result<(), String> {
 
 #[tauri::command]
 pub fn open_in_vscode(path: &str) -> Result<(), String> {
-    let target = if std::path::Path::new(path).is_dir() {
-        path.to_string()
+    let p = std::path::Path::new(path);
+    if p.is_dir() {
+        // Open folder in VS Code
+        std::process::Command::new("cmd")
+            .args(["/C", "code", path])
+            .spawn()
+            .map_err(|e| e.to_string())?;
     } else {
-        std::path::Path::new(path)
-            .parent()
-            .unwrap_or(std::path::Path::new("C:\\"))
-            .to_string_lossy()
-            .to_string()
-    };
-    // Try cmd /C code (works with the PATH shell wrapper)
-    std::process::Command::new("cmd")
-        .args(["/C", "code", &target])
-        .spawn()
-        .map_err(|e| e.to_string())?;
+        // Open file in VS Code (also opens its parent folder as workspace)
+        let dir = p.parent().unwrap_or(std::path::Path::new("C:\\"));
+        std::process::Command::new("cmd")
+            .args(["/C", "code", &dir.to_string_lossy(), path])
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
     Ok(())
 }
 
