@@ -29,7 +29,7 @@ export function ResultGroup({ category, results, selectedIndex, globalStartIndex
   return (
     <div class={`result-group ${isActive ? "active-group" : ""}`}>
       <div class="result-group-header">
-        <span>{category}</span>
+        <span>{category} ({results.length})</span>
         {hint && <span class="group-hint">{hint}</span>}
       </div>
       {results.map((result, i) => (

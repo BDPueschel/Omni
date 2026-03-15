@@ -390,6 +390,18 @@ export function App() {
           }
           setSelectedIndex(nextIndex);
           break;
+        case "c":
+        case "C":
+          if (e.ctrlKey && flatResults.length > 0) {
+            e.preventDefault();
+            const r = flatResults[selectedIndex];
+            if (r) {
+              navigator.clipboard.writeText(r.subtitle);
+              setCopiedFlash(true);
+              setTimeout(() => setCopiedFlash(false), 1000);
+            }
+          }
+          break;
         case "e":
         case "E":
           if (e.ctrlKey && flatResults.length > 0) {
@@ -475,7 +487,7 @@ export function App() {
         } else if (flatResults.length === 0) {
           targetHeight = 110;
         } else {
-          const base = 52 + 44;
+          const base = 52 + 44 + 22; // search bar + padding + status bar
           const groupCost = grouped.length * 38;
           const resultCost = flatResults.length * 44;
           targetHeight = base + groupCost + resultCost;
@@ -576,6 +588,7 @@ export function App() {
               <div class="help-row"><kbd>Enter</kbd><span>Open / execute</span></div>
               <div class="help-row"><kbd>Shift+→</kbd><span>Context menu</span></div>
               <div class="help-row"><kbd>Shift+←</kbd><span>Close context menu</span></div>
+              <div class="help-row"><kbd>Ctrl+C</kbd><span>Copy path of selected result</span></div>
               <div class="help-row"><kbd>Ctrl+E</kbd><span>Expand category (50 results)</span></div>
               <div class="help-row"><kbd>Ctrl+Space</kbd><span>Preview file (↑↓ scroll, PgUp/Dn page)</span></div>
               <div class="help-row"><kbd>Escape</kbd><span>Collapse / hide</span></div>
@@ -592,6 +605,11 @@ export function App() {
             <div class="help-row"><kbd>foo bar</kbd><span>Fuzzy fragments (matches *foo*bar*)</span></div>
             <div class="help-row"><kbd>regex:pattern</kbd><span>Regex search (also r:)</span></div>
           </div>
+        </div>
+      )}
+      {flatResults.length > 0 && !showHelp && !previewData && contextMenuIndex === null && (
+        <div class="status-bar">
+          {flatResults[selectedIndex]?.subtitle || ""}
         </div>
       )}
     </div>
