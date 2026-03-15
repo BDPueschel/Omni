@@ -1,6 +1,6 @@
 use crate::config::OmniConfig;
 use crate::providers::apps::{AppEntry, AppProvider};
-use crate::providers::everything::{EverythingProvider, EverythingStatus};
+use crate::providers::everything::EverythingProvider;
 use crate::providers::math::MathProvider;
 use crate::providers::system::SystemProvider;
 use crate::providers::url::UrlProvider;
@@ -38,19 +38,13 @@ pub fn search_query(
     let has_url = !urls.is_empty();
     all_results.extend(urls);
 
-    // Apps — prefer Everything for app search, fall back to local AppProvider
-    let app_results = if EverythingProvider::check_status() == EverythingStatus::Ready {
-        let results = EverythingProvider::search_apps(query, max);
-        if results.is_empty() {
-            // Fallback if Everything returned nothing (e.g. query too short)
-            AppProvider::search(apps, query, max)
-        } else {
-            results
-        }
+    // Apps — try Everything first (finds more apps), fall back to local scan
+    let app_results = EverythingProvider::search_apps(query, max);
+    if app_results.is_empty() {
+        all_results.extend(AppProvider::search(apps, query, max));
     } else {
-        AppProvider::search(apps, query, max)
-    };
-    all_results.extend(app_results);
+        all_results.extend(app_results);
+    }
 
     // System commands
     let system_results = SystemProvider::evaluate(query);

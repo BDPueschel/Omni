@@ -1,9 +1,10 @@
 use super::{ResultAction, SearchResult};
-use libloading::{Library, Symbol};
-use std::ffi::OsStr;
-use std::os::windows::ffi::OsStrExt;
 use std::path::Path;
+use std::process::Command;
 use std::sync::OnceLock;
+
+/// Path to es.exe — resolved once at startup.
+static ES_EXE_PATH: OnceLock<Option<String>> = OnceLock::new();
 
 #[derive(Debug, PartialEq)]
 pub enum EverythingStatus {
@@ -12,191 +13,154 @@ pub enum EverythingStatus {
     NotRunning,
 }
 
-type SetSearchW = unsafe extern "system" fn(*const u16);
-type SetMax = unsafe extern "system" fn(u32);
-type QueryW = unsafe extern "system" fn(i32) -> i32;
-type GetNumResults = unsafe extern "system" fn() -> u32;
-type GetResultFullPathNameW = unsafe extern "system" fn(u32, *mut u16, u32) -> u32;
-type IsDBLoaded = unsafe extern "system" fn() -> i32;
-type GetLastError = unsafe extern "system" fn() -> u32;
-
-static EVERYTHING_LIB: OnceLock<Option<Library>> = OnceLock::new();
-
-fn default_dll_paths() -> Vec<String> {
-    let mut paths = vec![
-        "C:\\Program Files\\Everything\\Everything64.dll".to_string(),
-        "C:\\Program Files\\Everything 1.5a\\Everything64.dll".to_string(),
-        "C:\\Program Files (x86)\\Everything\\Everything64.dll".to_string(),
-    ];
-    // Also check next to our own executable
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            paths.insert(0, dir.join("Everything64.dll").to_string_lossy().to_string());
-        }
-    }
-    paths
-}
-
 pub struct EverythingProvider;
 
 impl EverythingProvider {
-    fn load_library() -> &'static Option<Library> {
-        EVERYTHING_LIB.get_or_init(|| {
-            for path in default_dll_paths() {
-                if Path::new(&path).exists() {
-                    if let Ok(lib) = unsafe { Library::new(&path) } {
-                        return Some(lib);
+    fn find_es_exe() -> &'static Option<String> {
+        ES_EXE_PATH.get_or_init(|| {
+            // Check next to our own executable and parent dirs
+            // (test binaries live in target/debug/deps/, but es.exe is in target/debug/)
+            if let Ok(exe) = std::env::current_exe() {
+                let mut dir = exe.parent();
+                for _ in 0..3 {
+                    if let Some(d) = dir {
+                        let candidate = d.join("es.exe");
+                        if candidate.exists() {
+                            return Some(candidate.to_string_lossy().to_string());
+                        }
+                        dir = d.parent();
                     }
+                }
+            }
+            // Check common install locations
+            for path in &[
+                "C:\\Program Files\\Everything\\es.exe",
+                "C:\\Program Files\\Everything 1.5a\\es.exe",
+                "C:\\Program Files (x86)\\Everything\\es.exe",
+            ] {
+                if Path::new(path).exists() {
+                    return Some(path.to_string());
                 }
             }
             None
         })
     }
 
-    pub fn check_status_at_path(dll_path: &str) -> EverythingStatus {
-        if !Path::new(dll_path).exists() {
+    fn run_es(args: &[&str]) -> Result<Vec<String>, String> {
+        let es_path = match Self::find_es_exe() {
+            Some(path) => path,
+            None => return Err("es.exe not found".to_string()),
+        };
+
+        let output = Command::new(es_path)
+            .args(["-instance", "1.5a"])
+            .args(args)
+            .output()
+            .map_err(|e| format!("Failed to run es.exe: {}", e))?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(format!("es.exe error: {}", stderr.trim()));
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        Ok(stdout
+            .lines()
+            .filter(|l| !l.trim().is_empty())
+            .map(|l| l.to_string())
+            .collect())
+    }
+
+    pub fn check_status_at_path(path: &str) -> EverythingStatus {
+        if !Path::new(path).exists() {
             return EverythingStatus::NotInstalled;
         }
         EverythingStatus::NotRunning
     }
 
     pub fn check_status() -> EverythingStatus {
-        let lib = Self::load_library();
-        match lib {
-            None => EverythingStatus::NotInstalled,
-            Some(lib) => {
-                let is_loaded: Result<Symbol<IsDBLoaded>, _> =
-                    unsafe { lib.get(b"Everything_IsDBLoaded\0") };
-                match is_loaded {
-                    Ok(func) => {
-                        if unsafe { func() } != 0 {
-                            EverythingStatus::Ready
-                        } else {
-                            EverythingStatus::NotRunning
-                        }
-                    }
-                    Err(_) => EverythingStatus::NotRunning,
+        if Self::find_es_exe().is_none() {
+            return EverythingStatus::NotInstalled;
+        }
+        match Self::run_es(&["-n", "1", "OMNI_HEALTH_CHECK"]) {
+            Ok(_) => EverythingStatus::Ready,
+            Err(_) => EverythingStatus::NotRunning,
+        }
+    }
+
+    /// General file search.
+    pub fn search(query: &str, max_results: usize) -> Vec<SearchResult> {
+        if Self::find_es_exe().is_none() {
+            return vec![SearchResult {
+                category: "Files".to_string(),
+                title: "Everything search not available".to_string(),
+                subtitle: "es.exe not found — reinstall Omni or Everything".to_string(),
+                action: ResultAction::OpenUrl {
+                    url: "https://www.voidtools.com/downloads/".to_string(),
+                },
+                icon: "alert".to_string(),
+            }];
+        }
+
+        let max_str = max_results.to_string();
+        match Self::run_es(&["-n", &max_str, query]) {
+            Ok(paths) => Self::format_file_results(paths),
+            Err(e) => {
+                eprintln!("Everything search error: {}", e);
+                vec![]
+            }
+        }
+    }
+
+    /// Search for applications (.lnk in Start Menu, .exe in Program Files).
+    pub fn search_apps(query: &str, max_results: usize) -> Vec<SearchResult> {
+        if Self::find_es_exe().is_none() {
+            return vec![];
+        }
+
+        let max_str = max_results.to_string();
+        let mut all_paths = Vec::new();
+
+        // Search Start Menu shortcuts (.lnk) — best source for apps
+        let lnk_query = format!("{}*.lnk", query);
+        for start_menu in &[
+            "C:\\ProgramData\\Microsoft\\Windows\\Start Menu",
+            "C:\\Users\\Brian\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu",
+        ] {
+            if let Ok(paths) = Self::run_es(&["-n", &max_str, &lnk_query, "-path", start_menu]) {
+                all_paths.extend(paths);
+            }
+        }
+
+        // Also search for .exe in Program Files if we have few results
+        if all_paths.len() < max_results {
+            let exe_query = format!("{}*.exe", query);
+            for prog_dir in &[
+                "C:\\Program Files",
+                "C:\\Program Files (x86)",
+            ] {
+                if let Ok(paths) = Self::run_es(&["-n", "3", &exe_query, "-path", prog_dir]) {
+                    all_paths.extend(paths);
                 }
             }
         }
+
+        // Deduplicate by filename stem (prefer .lnk over .exe)
+        let mut seen = std::collections::HashSet::new();
+        all_paths.retain(|p| {
+            let stem = Path::new(p)
+                .file_stem()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_lowercase();
+            seen.insert(stem)
+        });
+
+        all_paths.truncate(max_results);
+        Self::format_app_results(all_paths)
     }
 
-    pub fn search(query: &str, max_results: usize) -> Vec<SearchResult> {
-        let lib = match Self::load_library() {
-            Some(lib) => lib,
-            None => {
-                return vec![SearchResult {
-                    category: "Files".to_string(),
-                    title: "Everything is not installed".to_string(),
-                    subtitle: "Download from voidtools.com".to_string(),
-                    action: ResultAction::OpenUrl {
-                        url: "https://www.voidtools.com/downloads/".to_string(),
-                    },
-                    icon: "alert".to_string(),
-                }];
-            }
-        };
-
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            Self::query_everything(lib, query, max_results)
-        }));
-
-        match result {
-            Ok(results) => results,
-            Err(_) => vec![],
-        }
-    }
-
-    fn query_everything(lib: &Library, query: &str, max_results: usize) -> Vec<SearchResult> {
-        unsafe {
-            let set_search: Symbol<SetSearchW> =
-                lib.get(b"Everything_SetSearchW\0").unwrap();
-            let set_max: Symbol<SetMax> = lib.get(b"Everything_SetMax\0").unwrap();
-            let do_query: Symbol<QueryW> = lib.get(b"Everything_QueryW\0").unwrap();
-            let get_num: Symbol<GetNumResults> =
-                lib.get(b"Everything_GetNumResults\0").unwrap();
-            let get_path: Symbol<GetResultFullPathNameW> =
-                lib.get(b"Everything_GetResultFullPathNameW\0").unwrap();
-
-            let get_last_error: Symbol<GetLastError> =
-                lib.get(b"Everything_GetLastError\0").unwrap();
-
-            let wide: Vec<u16> = OsStr::new(query)
-                .encode_wide()
-                .chain(std::iter::once(0))
-                .collect();
-            set_search(wide.as_ptr());
-            set_max(max_results as u32);
-            do_query(1);
-
-            let error_code = get_last_error();
-            if error_code != 0 {
-                let error_msg = match error_code {
-                    1 => "Everything: memory allocation error",
-                    2 => "Everything: IPC not available (is Everything running?)",
-                    3 => "Everything: failed to register search query",
-                    4 => "Everything: IPC query creation error",
-                    _ => "Everything: unknown error",
-                };
-                eprintln!("{} (code {})", error_msg, error_code);
-                return vec![];
-            }
-
-            let count = get_num();
-            let mut paths = Vec::new();
-            for i in 0..count {
-                let mut buf = vec![0u16; 1024];
-                get_path(i, buf.as_mut_ptr(), buf.len() as u32);
-                let len = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
-                let path = String::from_utf16_lossy(&buf[..len]);
-                paths.push(path);
-            }
-            Self::format_results(paths)
-        }
-    }
-
-    /// Search for apps (.lnk and .exe) via Everything in typical app locations.
-    pub fn search_apps(query: &str, max_results: usize) -> Vec<SearchResult> {
-        let lib = match Self::load_library() {
-            Some(lib) => lib,
-            None => return vec![],
-        };
-
-        // Everything search syntax: filter by extension and common app paths
-        let everything_query = format!(
-            "{} ext:lnk;exe path:\"C:\\ProgramData\\Microsoft\\Windows\\Start Menu\" | path:\"C:\\Users\" | path:\"C:\\Program Files\" | path:\"C:\\Program Files (x86)\"",
-            query
-        );
-
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            Self::query_everything(lib, &everything_query, max_results)
-        }));
-
-        match result {
-            Ok(results) => results
-                .into_iter()
-                .map(|r| {
-                    let title = Path::new(&r.subtitle)
-                        .file_stem()
-                        .unwrap_or_default()
-                        .to_string_lossy()
-                        .to_string();
-                    SearchResult {
-                        category: "Apps".to_string(),
-                        title,
-                        subtitle: r.subtitle.clone(),
-                        action: ResultAction::LaunchApp {
-                            path: r.subtitle,
-                        },
-                        icon: "app".to_string(),
-                    }
-                })
-                .collect(),
-            Err(_) => vec![],
-        }
-    }
-
-    pub fn format_results(paths: Vec<String>) -> Vec<SearchResult> {
+    fn format_file_results(paths: Vec<String>) -> Vec<SearchResult> {
         paths
             .into_iter()
             .map(|path| {
@@ -214,5 +178,29 @@ impl EverythingProvider {
                 }
             })
             .collect()
+    }
+
+    fn format_app_results(paths: Vec<String>) -> Vec<SearchResult> {
+        paths
+            .into_iter()
+            .map(|path| {
+                let name = Path::new(&path)
+                    .file_stem()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string();
+                SearchResult {
+                    category: "Apps".to_string(),
+                    title: name,
+                    subtitle: path.clone(),
+                    action: ResultAction::LaunchApp { path },
+                    icon: "app".to_string(),
+                }
+            })
+            .collect()
+    }
+
+    pub fn format_results(paths: Vec<String>) -> Vec<SearchResult> {
+        Self::format_file_results(paths)
     }
 }
