@@ -43,7 +43,8 @@ pub fn run() {
                 if event.state == ShortcutState::Pressed {
                     let w = win_clone.clone();
                     if w.is_visible().unwrap_or(false) {
-                        // If already visible, emit select-all instead of hiding
+                        // If already visible, re-focus and emit select-all
+                        let _ = w.set_focus();
                         let _ = w.emit("select-query", ());
                     } else {
                         // Position at top-center of screen so results expand downward
