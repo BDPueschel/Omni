@@ -25,7 +25,7 @@ export function SearchInput({ value, onInput, onKeyDown }: Props) {
 
   return (
     <div class="search-input-wrapper">
-      <img src="/omni-icon.svg" class="search-icon-img" />
+      <img src="/omni-icon.png" class="search-icon-img" />
       <input
         ref={inputRef}
         type="text"
