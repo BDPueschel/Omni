@@ -39,21 +39,23 @@ pub fn run() {
 
             let shortcut = Shortcut::new(Some(Modifiers::ALT), Code::Space);
             let win_clone = window.clone();
+            // Track whether the Press event was a "show" so Released doesn't also select
+            let was_show = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
             app.global_shortcut().on_shortcut(shortcut, move |_app, _shortcut, event| {
+                let w = win_clone.clone();
                 if event.state == ShortcutState::Pressed {
-                    let w = win_clone.clone();
                     if w.is_visible().unwrap_or(false) {
-                        // If already visible, re-focus and emit select-all
-                        let _ = w.set_focus();
-                        let _ = w.emit("select-query", ());
+                        // Already visible — Released will handle select-all
+                        was_show.store(false, std::sync::atomic::Ordering::SeqCst);
                     } else {
-                        // Position at top-center of screen so results expand downward
+                        // Show window on press
+                        was_show.store(true, std::sync::atomic::Ordering::SeqCst);
                         if let Ok(Some(monitor)) = w.current_monitor() {
                             let screen = monitor.size();
                             let scale = monitor.scale_factor();
                             let win_width = 600.0 * scale;
                             let x = ((screen.width as f64 - win_width) / 2.0) as i32;
-                            let y = (screen.height as f64 * 0.15) as i32; // 15% from top
+                            let y = (screen.height as f64 * 0.15) as i32;
                             let _ = w.set_position(tauri::Position::Physical(
                                 tauri::PhysicalPosition::new(x, y),
                             ));
@@ -61,6 +63,14 @@ pub fn run() {
                         let _ = w.show();
                         let _ = w.set_focus();
                         let _ = w.emit("window-shown", ());
+                    }
+                } else if event.state == ShortcutState::Released {
+                    // Only select-all if this wasn't a fresh show
+                    if !was_show.load(std::sync::atomic::Ordering::SeqCst)
+                        && w.is_visible().unwrap_or(false)
+                    {
+                        let _ = w.set_focus();
+                        let _ = w.emit("select-query", ());
                     }
                 }
             })?;

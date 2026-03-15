@@ -953,18 +953,14 @@ export function App() {
       }
     });
     const unlistenSelect = listen("select-query", () => {
-      // Alt+Space when already visible: select all text in search bar and focus it.
-      // Use a short delay to let the global shortcut handler release the Alt key
-      // and allow the WebView to fully regain focus — without this, the next
-      // keystroke arrives before focus is restored and Windows plays the ding sound.
-      setTimeout(() => {
-        const input = document.querySelector(".omni-input") as HTMLInputElement | null;
-        if (input) {
-          input.focus();
-          input.select();
-        }
-        setActivePanel("results");
-      }, 80);
+      // Alt+Space when already visible: select all text in search bar.
+      // This fires on key Release so Alt is no longer held — no ding.
+      const input = document.querySelector(".omni-input") as HTMLInputElement | null;
+      if (input) {
+        input.focus();
+        input.select();
+      }
+      setActivePanel("results");
     });
     return () => {
       unlistenClear.then((fn) => fn());
