@@ -431,16 +431,27 @@ export function App() {
     [flatResults, selectedIndex, grouped, executeResult, expandCategory, expandedCategory, query, contextMenuIndex, contextActionIndex, executeContextAction, showHelp, previewData]
   );
 
-  // Scroll selected item into view — if it's the first in a group, scroll the group header instead
+  // Scroll selected item into view with padding for group headers
   useEffect(() => {
-    const el = document.querySelector(".result-item.selected");
-    if (el) {
-      const prev = el.previousElementSibling;
-      if (prev && prev.classList.contains("result-group-header")) {
-        // First item in group — scroll the header into view so it's visible
-        prev.scrollIntoView({ block: "nearest" });
-      } else {
-        el.scrollIntoView({ block: "nearest" });
+    const el = document.querySelector(".result-item.selected") as HTMLElement | null;
+    const container = document.querySelector(".results-container") as HTMLElement | null;
+    if (!el || !container) return;
+
+    const prev = el.previousElementSibling as HTMLElement | null;
+    const target = (prev && prev.classList.contains("result-group-header")) ? prev : el;
+
+    const containerRect = container.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+
+    // If target is above the visible area, scroll up with 12px padding
+    if (targetRect.top < containerRect.top) {
+      container.scrollTop -= (containerRect.top - targetRect.top + 12);
+    }
+    // If selected item is below the visible area, scroll down
+    else {
+      const elRect = el.getBoundingClientRect();
+      if (elRect.bottom > containerRect.bottom) {
+        container.scrollTop += (elRect.bottom - containerRect.bottom + 8);
       }
     }
   }, [selectedIndex]);
