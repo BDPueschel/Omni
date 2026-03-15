@@ -18,6 +18,7 @@ type QueryW = unsafe extern "system" fn(i32) -> i32;
 type GetNumResults = unsafe extern "system" fn() -> u32;
 type GetResultFullPathNameW = unsafe extern "system" fn(u32, *mut u16, u32) -> u32;
 type IsDBLoaded = unsafe extern "system" fn() -> i32;
+type GetLastError = unsafe extern "system" fn() -> u32;
 
 static EVERYTHING_LIB: OnceLock<Option<Library>> = OnceLock::new();
 
@@ -117,6 +118,9 @@ impl EverythingProvider {
             let get_path: Symbol<GetResultFullPathNameW> =
                 lib.get(b"Everything_GetResultFullPathNameW\0").unwrap();
 
+            let get_last_error: Symbol<GetLastError> =
+                lib.get(b"Everything_GetLastError\0").unwrap();
+
             let wide: Vec<u16> = OsStr::new(query)
                 .encode_wide()
                 .chain(std::iter::once(0))
@@ -124,6 +128,19 @@ impl EverythingProvider {
             set_search(wide.as_ptr());
             set_max(max_results as u32);
             do_query(1);
+
+            let error_code = get_last_error();
+            if error_code != 0 {
+                let error_msg = match error_code {
+                    1 => "Everything: memory allocation error",
+                    2 => "Everything: IPC not available (is Everything running?)",
+                    3 => "Everything: failed to register search query",
+                    4 => "Everything: IPC query creation error",
+                    _ => "Everything: unknown error",
+                };
+                eprintln!("{} (code {})", error_msg, error_code);
+                return vec![];
+            }
 
             let count = get_num();
             let mut paths = Vec::new();
@@ -135,6 +152,47 @@ impl EverythingProvider {
                 paths.push(path);
             }
             Self::format_results(paths)
+        }
+    }
+
+    /// Search for apps (.lnk and .exe) via Everything in typical app locations.
+    pub fn search_apps(query: &str, max_results: usize) -> Vec<SearchResult> {
+        let lib = match Self::load_library() {
+            Some(lib) => lib,
+            None => return vec![],
+        };
+
+        // Everything search syntax: filter by extension and common app paths
+        let everything_query = format!(
+            "{} ext:lnk;exe path:\"C:\\ProgramData\\Microsoft\\Windows\\Start Menu\" | path:\"C:\\Users\" | path:\"C:\\Program Files\" | path:\"C:\\Program Files (x86)\"",
+            query
+        );
+
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            Self::query_everything(lib, &everything_query, max_results)
+        }));
+
+        match result {
+            Ok(results) => results
+                .into_iter()
+                .map(|r| {
+                    let title = Path::new(&r.subtitle)
+                        .file_stem()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .to_string();
+                    SearchResult {
+                        category: "Apps".to_string(),
+                        title,
+                        subtitle: r.subtitle.clone(),
+                        action: ResultAction::LaunchApp {
+                            path: r.subtitle,
+                        },
+                        icon: "app".to_string(),
+                    }
+                })
+                .collect(),
+            Err(_) => vec![],
         }
     }
 

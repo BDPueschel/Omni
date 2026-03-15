@@ -62,9 +62,18 @@ html, body, #app {
   width: 4px;
 }
 
+.results-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 .results-container::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: transparent;
   border-radius: 2px;
+  transition: background 0.2s;
+}
+
+.results-container:hover::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
 }
 
 .result-group {
