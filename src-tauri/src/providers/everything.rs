@@ -22,6 +22,10 @@ struct EverythingHttpResult {
     name: String,
     #[serde(default)]
     path: String,
+    #[serde(default)]
+    size: Option<u64>,
+    #[serde(default)]
+    date_modified: Option<u64>,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -30,6 +34,16 @@ struct EverythingResponse {
     #[allow(dead_code)]
     total_results: u64,
     results: Vec<EverythingHttpResult>,
+}
+
+/// Convert Windows FILETIME (100-ns intervals since 1601-01-01) to Unix epoch seconds.
+pub fn filetime_to_unix(ft: u64) -> u64 {
+    // Difference between 1601-01-01 and 1970-01-01 in 100-ns intervals
+    const EPOCH_DIFF: u64 = 116444736000000000;
+    if ft <= EPOCH_DIFF {
+        return 0;
+    }
+    (ft - EPOCH_DIFF) / 10_000_000
 }
 
 pub struct EverythingProvider;
@@ -113,7 +127,7 @@ impl EverythingProvider {
         };
 
         let url = format!(
-            "/?s={}&c={}&j=1&path_column=1&sort={}&ascending={}",
+            "/?s={}&c={}&j=1&path_column=1&size_column=1&date_modified_column=1&sort={}&ascending={}",
             encoded_query,
             max_results,
             sort,
@@ -363,8 +377,8 @@ impl EverythingProvider {
                                 path: full_path,
                             },
                             icon: "folder".to_string(),
-                            size: None,
-                            date_modified: None,
+                            size: r.size,
+                            date_modified: r.date_modified.map(filetime_to_unix),
                         });
                     } else if r.result_type == "file" && files.len() < max_per_type {
                         let filename = Path::new(&full_path)
@@ -380,8 +394,8 @@ impl EverythingProvider {
                                 path: full_path,
                             },
                             icon: "file".to_string(),
-                            size: None,
-                            date_modified: None,
+                            size: r.size,
+                            date_modified: r.date_modified.map(filetime_to_unix),
                         });
                     }
                 }
@@ -609,8 +623,8 @@ impl EverythingProvider {
                     subtitle: full_path.clone(),
                     action: ResultAction::OpenFile { path: full_path },
                     icon: "file".to_string(),
-                    size: None,
-                    date_modified: None,
+                    size: r.size,
+                    date_modified: r.date_modified.map(filetime_to_unix),
                 }
             })
             .collect()
@@ -636,8 +650,8 @@ impl EverythingProvider {
                     subtitle: full_path.clone(),
                     action: ResultAction::OpenFile { path: full_path },
                     icon: "folder".to_string(),
-                    size: None,
-                    date_modified: None,
+                    size: r.size,
+                    date_modified: r.date_modified.map(filetime_to_unix),
                 }
             })
             .collect()
