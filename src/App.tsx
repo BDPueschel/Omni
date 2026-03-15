@@ -135,7 +135,7 @@ export function App() {
     el?.scrollIntoView({ block: "nearest" });
   }, [selectedIndex]);
 
-  // Resize window to fit content — calculate from result count
+  // Resize window — anchor top position, only grow downward
   useEffect(() => {
     (async () => {
       try {
@@ -145,29 +145,19 @@ export function App() {
 
         let targetHeight: number;
         if (flatResults.length === 0 && !query.trim()) {
-          targetHeight = 72;
+          targetHeight = 68;
         } else if (flatResults.length === 0) {
           targetHeight = 130;
         } else {
-          // search bar(~58) + container margin(16) + container border(2) + results padding(16)
-          // + per group: header(28) + border(2) + margin(8)
-          // + per result: row height(44)
-          // + bottom breathing room(16)
-          const base = 58 + 16 + 2 + 16 + 16;
+          const base = 56 + 16 + 2 + 16 + 16;
           const groupCost = grouped.length * 38;
           const resultCost = flatResults.length * 44;
           targetHeight = base + groupCost + resultCost;
           targetHeight = Math.min(targetHeight, 800);
         }
 
-        console.log(`[Omni resize] results=${flatResults.length} groups=${grouped.length} target=${targetHeight}px`);
-        const size = new LogicalSize(600, targetHeight);
-        console.log(`[Omni resize] LogicalSize:`, size);
-        await win.setSize(size);
-        console.log(`[Omni resize] setSize completed`);
-
-        // Re-center after resize
-        await win.center();
+        // Only resize height, don't re-center — keeps search bar anchored
+        await win.setSize(new LogicalSize(600, targetHeight));
       } catch (e) {
         console.error(`[Omni resize] ERROR:`, e);
       }

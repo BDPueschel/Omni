@@ -42,7 +42,17 @@ pub fn run() {
                         let _ = w.hide();
                         let _ = w.emit("clear-query", ());
                     } else {
-                        let _ = w.center();
+                        // Position at top-center of screen so results expand downward
+                        if let Ok(Some(monitor)) = w.current_monitor() {
+                            let screen = monitor.size();
+                            let scale = monitor.scale_factor();
+                            let win_width = 600.0 * scale;
+                            let x = ((screen.width as f64 - win_width) / 2.0) as i32;
+                            let y = (screen.height as f64 * 0.15) as i32; // 15% from top
+                            let _ = w.set_position(tauri::Position::Physical(
+                                tauri::PhysicalPosition::new(x, y),
+                            ));
+                        }
                         let _ = w.show();
                         let _ = w.set_focus();
                         let _ = w.emit("window-shown", ());
@@ -76,7 +86,6 @@ pub fn run() {
                 .menu(&menu)
                 .on_menu_event(move |app, event| match event.id.as_ref() {
                     "show" => {
-                        let _ = win_tray.center();
                         let _ = win_tray.show();
                         let _ = win_tray.set_focus();
                     }

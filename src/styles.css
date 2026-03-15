@@ -31,7 +31,7 @@ html, body, #app {
 
 .omni-input {
   width: 100%;
-  padding: 16px 20px;
+  padding: 12px 12px;
   font-size: 18px;
   background: transparent;
   border: none;
@@ -46,8 +46,9 @@ html, body, #app {
 .search-input-wrapper {
   display: flex;
   align-items: center;
-  padding: 8px 8px;
+  padding: 6px 8px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
 }
 
 .search-icon {
