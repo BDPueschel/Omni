@@ -138,22 +138,33 @@ export function App() {
   // Resize window to fit content — calculate from result count
   useEffect(() => {
     (async () => {
-      const { getCurrentWindow } = await import("@tauri-apps/api/window");
-      const { LogicalSize } = await import("@tauri-apps/api/dpi");
-      const win = getCurrentWindow();
+      try {
+        const { getCurrentWindow } = await import("@tauri-apps/api/window");
+        const { LogicalSize } = await import("@tauri-apps/api/dpi");
+        const win = getCurrentWindow();
 
-      if (flatResults.length === 0 && !query.trim()) {
-        // Just the search bar
-        await win.setSize(new LogicalSize(600, 62));
-      } else if (flatResults.length === 0) {
-        // "No results found" state
-        await win.setSize(new LogicalSize(600, 120));
-      } else {
-        // Calculate: search bar (~54px) + padding (16px) + per group header (28px) + per result row (42px) + group margins
-        const numGroups = grouped.length;
-        const numResults = flatResults.length;
-        const height = 54 + 16 + (numGroups * 36) + (numResults * 42) + 8;
-        await win.setSize(new LogicalSize(600, Math.min(height, 700)));
+        let targetHeight: number;
+        if (flatResults.length === 0 && !query.trim()) {
+          targetHeight = 62;
+        } else if (flatResults.length === 0) {
+          targetHeight = 120;
+        } else {
+          const numGroups = grouped.length;
+          const numResults = flatResults.length;
+          targetHeight = 54 + 16 + (numGroups * 36) + (numResults * 42) + 8;
+          targetHeight = Math.min(targetHeight, 700);
+        }
+
+        console.log(`[Omni resize] results=${flatResults.length} groups=${grouped.length} target=${targetHeight}px`);
+        const size = new LogicalSize(600, targetHeight);
+        console.log(`[Omni resize] LogicalSize:`, size);
+        await win.setSize(size);
+        console.log(`[Omni resize] setSize completed`);
+
+        // Re-center after resize
+        await win.center();
+      } catch (e) {
+        console.error(`[Omni resize] ERROR:`, e);
       }
     })();
   }, [flatResults.length, grouped.length, query]);
