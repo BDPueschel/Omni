@@ -393,3 +393,143 @@ html, body {
   color: rgba(255, 255, 255, 0.6);
   flex-shrink: 0;
 }
+
+/* Table panel (Ctrl+T) */
+.omni-split {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.omni-split > .results-container {
+  width: 600px;
+  flex-shrink: 0;
+}
+
+.table-divider {
+  width: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.panel-active {
+  border-top: 2px solid rgba(130, 180, 255, 0.5);
+}
+
+.panel-inactive {
+  border-top: 2px solid transparent;
+  opacity: 0.7;
+}
+
+.table-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.table-header {
+  display: flex;
+  padding: 6px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: rgba(255, 255, 255, 0.4);
+  flex-shrink: 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.table-header .table-col:hover {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.sort-arrow {
+  font-size: 9px;
+  margin-left: 4px;
+  color: rgba(130, 180, 255, 0.7);
+}
+
+.table-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-y: overlay;
+}
+
+.table-body::-webkit-scrollbar {
+  width: 0;
+  background: transparent;
+}
+
+.table-row {
+  display: flex;
+  padding: 5px 8px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.table-row:hover,
+.table-row.selected {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.table-row.multi-selected {
+  background: rgba(130, 180, 255, 0.08);
+  border-left: 2px solid rgba(130, 180, 255, 0.5);
+}
+
+.table-row.multi-selected.selected {
+  background: rgba(130, 180, 255, 0.15);
+}
+
+.table-col {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 4px;
+}
+
+.col-name {
+  width: 35%;
+  flex-shrink: 0;
+}
+
+.col-path {
+  width: 35%;
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.col-size {
+  width: 12%;
+  flex-shrink: 0;
+  text-align: right;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.col-date {
+  width: 18%;
+  flex-shrink: 0;
+  text-align: right;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.table-icon {
+  font-size: 9px;
+  font-weight: 700;
+  margin-right: 6px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.table-empty {
+  text-align: center;
+  padding: 24px;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 13px;
+}
