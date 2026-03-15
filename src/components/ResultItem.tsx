@@ -15,10 +15,11 @@ interface SearchResult {
 interface Props {
   result: SearchResult;
   isSelected: boolean;
+  isMultiSelected: boolean;
   onExecute: () => void;
 }
 
-export function ResultItem({ result, isSelected, onExecute }: Props) {
+export function ResultItem({ result, isSelected, isMultiSelected, onExecute }: Props) {
   const iconInfo = getIcon(result.icon, result.subtitle);
   const [iconUri, setIconUri] = useState<string | null>(null);
 
@@ -43,7 +44,7 @@ export function ResultItem({ result, isSelected, onExecute }: Props) {
 
   return (
     <div
-      class={`result-item ${isSelected ? "selected" : ""}`}
+      class={`result-item ${isSelected ? "selected" : ""} ${isMultiSelected ? "multi-selected" : ""}`}
       onClick={onExecute}
     >
       {isColorSwatch ? (

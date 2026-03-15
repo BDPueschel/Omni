@@ -16,11 +16,12 @@ interface Props {
   onExecute: (index: number) => void;
   isActive: boolean;
   isExpanded: boolean;
+  multiSelected: Set<number>;
 }
 
 const EXPANDABLE = ["Apps", "Files", "Directories", "System"];
 
-export function ResultGroup({ category, results, selectedIndex, globalStartIndex, onExecute, isActive, isExpanded }: Props) {
+export function ResultGroup({ category, results, selectedIndex, globalStartIndex, onExecute, isActive, isExpanded, multiSelected }: Props) {
   if (results.length === 0) return null;
 
   const canExpand = EXPANDABLE.includes(category) && !isExpanded;
@@ -37,6 +38,7 @@ export function ResultGroup({ category, results, selectedIndex, globalStartIndex
           key={`${category}-${i}`}
           result={result}
           isSelected={selectedIndex === globalStartIndex + i}
+          isMultiSelected={multiSelected.has(globalStartIndex + i)}
           onExecute={() => onExecute(globalStartIndex + i)}
         />
       ))}

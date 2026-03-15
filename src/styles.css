@@ -132,6 +132,15 @@ html, body {
   background: rgba(255, 255, 255, 0.08);
 }
 
+.result-item.multi-selected {
+  background: rgba(130, 180, 255, 0.08);
+  border-left: 2px solid rgba(130, 180, 255, 0.5);
+}
+
+.result-item.multi-selected.selected {
+  background: rgba(130, 180, 255, 0.15);
+}
+
 .result-icon {
   font-size: 11px;
   font-weight: 700;

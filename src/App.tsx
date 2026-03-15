@@ -15,6 +15,33 @@ interface SearchResult {
   icon: string;
 }
 
+function BatchContextMenu({ count, selectedAction, onExecute }: { count: number; selectedAction: number; onExecute: (i: number) => void }) {
+  const labels = [
+    `Open all (${count} items)`,
+    "Copy all paths",
+    "Copy all to...",
+    "Move all to...",
+    "Delete all (recycle bin)",
+  ];
+  return (
+    <div class="context-menu">
+      <div class="context-menu-header">
+        Batch actions ({count} items)
+        <span class="context-hint">Shift+\u2190 back</span>
+      </div>
+      {labels.map((label, i) => (
+        <div
+          key={i}
+          class={`context-action ${i === selectedAction ? "selected" : ""}`}
+          onClick={() => onExecute(i)}
+        >
+          {label}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const CATEGORY_ORDER = ["Frequent", "Math", "Color", "Apps", "System", "Clipboard", "Processes", "Files", "Directories", "URL", "Web"];
 
 export function App() {
@@ -29,6 +56,7 @@ export function App() {
   const [previewData, setPreviewData] = useState<FilePreview | null>(null);
   const [completionCandidates, setCompletionCandidates] = useState<string[]>([]);
   const [completionIndex, setCompletionIndex] = useState(0);
+  const [multiSelected, setMultiSelected] = useState<Set<number>>(new Set());
   const debounceRef = useRef<number | null>(null);
 
   const grouped = CATEGORY_ORDER.map((cat) => ({
@@ -47,6 +75,7 @@ export function App() {
     setPreviewData(null);
     setCompletionCandidates([]);
     setCompletionIndex(0);
+    setMultiSelected(new Set());
 
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
@@ -228,13 +257,14 @@ export function App() {
 
       // Context menu is open — handle its navigation
       if (contextMenuIndex !== null) {
-        const result = flatResults[contextMenuIndex];
-        const actions = result ? getActions(result) : [];
+        const isBatch = contextMenuIndex === -1;
+        const result = isBatch ? null : flatResults[contextMenuIndex];
+        const actionCount = isBatch ? 5 : (result ? getActions(result).length : 0);
 
         switch (e.key) {
           case "ArrowDown":
             e.preventDefault();
-            setContextActionIndex((i) => Math.min(i + 1, actions.length - 1));
+            setContextActionIndex((i) => Math.min(i + 1, actionCount - 1));
             return;
           case "ArrowUp":
             e.preventDefault();
@@ -242,7 +272,30 @@ export function App() {
             return;
           case "Enter":
             e.preventDefault();
-            executeContextAction(contextActionIndex);
+            if (isBatch) {
+              // Batch context menu — trigger via the onExecute passed to BatchContextMenu
+              // We need to simulate clicking the action; dispatch it here directly
+              const indices = [...new Set([...multiSelected, selectedIndex])];
+              const paths = indices.map(i => flatResults[i]?.subtitle).filter(Boolean);
+              const batchHandlers = [
+                () => invoke("batch_open", { paths }),
+                () => navigator.clipboard.writeText(paths.join("\n")),
+                () => invoke("batch_copy_to", { paths }),
+                () => invoke("batch_move_to", { paths }),
+                async () => {
+                  const confirmed = window.confirm(`Move ${paths.length} items to recycle bin?`);
+                  if (confirmed) await invoke("batch_delete", { paths });
+                },
+              ];
+              if (contextActionIndex >= 0 && contextActionIndex < batchHandlers.length) {
+                batchHandlers[contextActionIndex]();
+              }
+              setContextMenuIndex(null);
+              setContextActionIndex(0);
+              setMultiSelected(new Set());
+            } else {
+              executeContextAction(contextActionIndex);
+            }
             return;
           case "ArrowLeft":
             if (e.shiftKey) {
@@ -307,6 +360,9 @@ export function App() {
       switch (e.key) {
         case "ArrowDown":
           e.preventDefault();
+          if (e.shiftKey && !e.ctrlKey) {
+            setMultiSelected(prev => new Set([...prev, selectedIndex]));
+          }
           if (e.ctrlKey) {
             const bounds = getCategoryBounds();
             if (selectedIndex === bounds.end) {
@@ -321,6 +377,9 @@ export function App() {
           break;
         case "ArrowUp":
           e.preventDefault();
+          if (e.shiftKey && !e.ctrlKey) {
+            setMultiSelected(prev => new Set([...prev, selectedIndex]));
+          }
           if (e.ctrlKey) {
             const bounds = getCategoryBounds();
             if (selectedIndex === bounds.start) {
@@ -362,19 +421,34 @@ export function App() {
           break;
         }
         case "ArrowRight":
-          // Shift+Right: open context menu
+          // Shift+Right: open context menu (batch or single)
           if (e.shiftKey && flatResults.length > 0) {
-            const result = flatResults[selectedIndex];
-            if (result && getActions(result).length > 0) {
+            if (multiSelected.size > 0) {
+              // Open batch context menu
               e.preventDefault();
-              setContextMenuIndex(selectedIndex);
+              setContextMenuIndex(-1); // -1 signals batch mode
               setContextActionIndex(0);
+            } else {
+              const result = flatResults[selectedIndex];
+              if (result && getActions(result).length > 0) {
+                e.preventDefault();
+                setContextMenuIndex(selectedIndex);
+                setContextActionIndex(0);
+              }
             }
           }
           break;
         case "Enter":
           e.preventDefault();
-          executeResult(selectedIndex);
+          if (multiSelected.size > 0) {
+            // Batch open: all multi-selected + current
+            const indices = new Set([...multiSelected, selectedIndex]);
+            const paths = [...indices].map(i => flatResults[i]?.subtitle).filter(Boolean);
+            invoke("batch_open", { paths });
+            setMultiSelected(new Set());
+          } else {
+            executeResult(selectedIndex);
+          }
           break;
         case "Tab":
           e.preventDefault();
@@ -455,7 +529,9 @@ export function App() {
           break;
         case "Escape":
           e.preventDefault();
-          if (showHelp) {
+          if (multiSelected.size > 0) {
+            setMultiSelected(new Set());
+          } else if (showHelp) {
             setShowHelp(false);
           } else if (expandedCategory) {
             setExpandedCategory(null);
@@ -466,7 +542,7 @@ export function App() {
           break;
       }
     },
-    [flatResults, selectedIndex, grouped, executeResult, expandCategory, expandedCategory, query, contextMenuIndex, contextActionIndex, executeContextAction, showHelp, previewData, completionCandidates, completionIndex]
+    [flatResults, selectedIndex, grouped, executeResult, expandCategory, expandedCategory, query, contextMenuIndex, contextActionIndex, executeContextAction, showHelp, previewData, completionCandidates, completionIndex, multiSelected]
   );
 
   // Scroll selected item into view with padding for group headers
@@ -536,6 +612,7 @@ export function App() {
       setResults([]);
       setSelectedIndex(0);
       setPreviewData(null);
+      setMultiSelected(new Set());
     });
     const unlistenShown = listen("window-shown", async () => {
       invoke("refresh_apps");
@@ -564,6 +641,33 @@ export function App() {
         <div class="results-container">
           <PreviewPanel preview={previewData} />
         </div>
+      ) : contextMenuIndex !== null && contextMenuIndex === -1 ? (
+        <div class="results-container">
+          <BatchContextMenu
+            count={multiSelected.size + 1}
+            selectedAction={contextActionIndex}
+            onExecute={(actionIndex: number) => {
+              const indices = [...new Set([...multiSelected, selectedIndex])];
+              const paths = indices.map(i => flatResults[i]?.subtitle).filter(Boolean);
+              const batchActions = [
+                { label: `Open all (${indices.length} items)`, handler: () => invoke("batch_open", { paths }) },
+                { label: "Copy all paths", handler: () => navigator.clipboard.writeText(paths.join("\n")) },
+                { label: "Copy all to...", handler: () => invoke("batch_copy_to", { paths }) },
+                { label: "Move all to...", handler: () => invoke("batch_move_to", { paths }) },
+                { label: "Delete all (recycle bin)", handler: async () => {
+                  const confirmed = window.confirm(`Move ${paths.length} items to recycle bin?`);
+                  if (confirmed) await invoke("batch_delete", { paths });
+                }},
+              ];
+              if (actionIndex >= 0 && actionIndex < batchActions.length) {
+                batchActions[actionIndex].handler();
+              }
+              setContextMenuIndex(null);
+              setContextActionIndex(0);
+              setMultiSelected(new Set());
+            }}
+          />
+        </div>
       ) : contextMenuIndex !== null && flatResults[contextMenuIndex] ? (
         <div class="results-container">
           <ContextMenu
@@ -587,6 +691,7 @@ export function App() {
                 onExecute={executeResult}
                 isActive={group.category === activeCategory}
                 isExpanded={group.category === expandedCategory}
+                multiSelected={multiSelected}
               />
             );
           })}
@@ -608,6 +713,7 @@ export function App() {
               <div class="help-row"><kbd>Home</kbd><span>First result</span></div>
               <div class="help-row"><kbd>End</kbd><span>Last result</span></div>
               <div class="help-row"><kbd>PgUp/PgDn</kbd><span>Category bounds</span></div>
+              <div class="help-row"><kbd>Shift+↑↓</kbd><span>Multi-select items</span></div>
             </div>
             <div class="help-section">
               <div class="help-section-title">Actions</div>
@@ -635,7 +741,9 @@ export function App() {
       )}
       {flatResults.length > 0 && !showHelp && !previewData && contextMenuIndex === null && (
         <div class="status-bar">
-          {flatResults[selectedIndex]?.subtitle || ""}
+          {multiSelected.size > 0
+            ? `${multiSelected.size + 1} items selected \u00b7 Shift+\u2192 for batch actions`
+            : flatResults[selectedIndex]?.subtitle || ""}
         </div>
       )}
     </div>

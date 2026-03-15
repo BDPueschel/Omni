@@ -461,6 +461,48 @@ pub fn complete_path(partial: String) -> Vec<String> {
     EverythingProvider::complete_path(&partial, 5)
 }
 
+#[tauri::command]
+pub fn batch_open(paths: Vec<String>) -> Result<(), String> {
+    for path in &paths {
+        open::that(path).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn batch_copy_to(paths: Vec<String>) -> Result<(), String> {
+    let paths_arg = paths.iter().map(|p| format!("'{}'", p.replace("'", "''"))).collect::<Vec<_>>().join(",");
+    let ps_cmd = format!(
+        r#"Add-Type -AssemblyName System.Windows.Forms; $f = New-Object System.Windows.Forms.FolderBrowserDialog; $f.Description = 'Copy {} items to...'; if ($f.ShowDialog() -eq 'OK') {{ @({}) | ForEach-Object {{ Copy-Item $_ -Destination $f.SelectedPath -Force }} }}"#,
+        paths.len(), paths_arg
+    );
+    std::process::Command::new("powershell").args(["-Command", &ps_cmd]).spawn().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn batch_move_to(paths: Vec<String>) -> Result<(), String> {
+    let paths_arg = paths.iter().map(|p| format!("'{}'", p.replace("'", "''"))).collect::<Vec<_>>().join(",");
+    let ps_cmd = format!(
+        r#"Add-Type -AssemblyName System.Windows.Forms; $f = New-Object System.Windows.Forms.FolderBrowserDialog; $f.Description = 'Move {} items to...'; if ($f.ShowDialog() -eq 'OK') {{ @({}) | ForEach-Object {{ Move-Item $_ -Destination $f.SelectedPath -Force }} }}"#,
+        paths.len(), paths_arg
+    );
+    std::process::Command::new("powershell").args(["-Command", &ps_cmd]).spawn().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn batch_delete(paths: Vec<String>) -> Result<(), String> {
+    for path in &paths {
+        let ps_cmd = format!(
+            "Add-Type -AssemblyName Microsoft.VisualBasic; [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile('{}', 'OnlyErrorDialogs', 'SendToRecycleBin')",
+            path.replace("'", "''")
+        );
+        std::process::Command::new("powershell").args(["-Command", &ps_cmd]).spawn().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 /// Dry-run version for testing — validates the command name without executing.
 pub fn execute_system_command_dry(command: &str) -> Result<(), String> {
     match command {
