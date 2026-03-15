@@ -531,15 +531,15 @@ export function App() {
               setShowHelp(v => !v);
             }
             return;
-          case "1": case "2": case "3": case "4":
+          case "1": case "2": case "3": case "4": case "5":
             if (e.ctrlKey) {
               e.preventDefault();
-              const cols: Array<SortColumn> = ["name", "path", "size", "date_modified"];
+              const cols: Array<SortColumn> = ["name", "type", "path", "size", "date_modified"];
               const col = cols[parseInt(e.key) - 1];
               // Toggle direction if same column, else use default for that column
               const asc = col === tableSortColumn
                 ? !tableSortAscending
-                : (col === "name" || col === "path");
+                : (col === "name" || col === "path" || col === "type");
               setTableSortColumn(col);
               setTableSortAscending(asc);
               fetchTableResults(query, col, asc);
@@ -1141,7 +1141,7 @@ export function App() {
               <div class="help-row"><kbd>Ctrl+Space</kbd><span>Preview file (↑↓ scroll, PgUp/Dn page)</span></div>
               <div class="help-row"><kbd>Escape</kbd><span>Collapse / hide</span></div>
               <div class="help-row"><kbd>Ctrl+T</kbd><span>Table view (file columns)</span></div>
-              <div class="help-row"><kbd>Ctrl+1-4</kbd><span>Sort table by column</span></div>
+              <div class="help-row"><kbd>Ctrl+1-5</kbd><span>Sort table by column</span></div>
               <div class="help-row"><kbd>Ctrl+H</kbd><span>Toggle this help</span></div>
             </div>
           </div>

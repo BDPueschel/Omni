@@ -1,3 +1,5 @@
+import { useRef } from "preact/hooks";
+
 interface TableResult {
   category: string;
   title: string;
@@ -8,7 +10,7 @@ interface TableResult {
   date_modified?: number;
 }
 
-type SortColumn = "name" | "path" | "size" | "date_modified";
+type SortColumn = "name" | "type" | "path" | "size" | "date_modified";
 
 interface Props {
   results: TableResult[];
@@ -22,11 +24,13 @@ interface Props {
 }
 
 export function TablePanel({ results, selectedIndex, multiSelected, sortColumn, sortAscending, onSelect, onExecute, onSortChange }: Props) {
+  const bodyRef = useRef<HTMLDivElement>(null);
+
   const handleHeaderClick = (col: SortColumn) => {
     if (col === sortColumn) {
       onSortChange(col, !sortAscending);
     } else {
-      onSortChange(col, col === "name" || col === "path");
+      onSortChange(col, col === "name" || col === "path" || col === "type");
     }
   };
 
@@ -35,11 +39,23 @@ export function TablePanel({ results, selectedIndex, multiSelected, sortColumn, 
     return <span class="sort-arrow">{sortAscending ? "\u25B2" : "\u25BC"}</span>;
   };
 
+  // Calculate visible rows for page indicator
+  const visibleRows = bodyRef.current
+    ? Math.floor(bodyRef.current.clientHeight / 27)
+    : 20;
+  const totalPages = visibleRows > 0 ? Math.ceil(results.length / visibleRows) : 1;
+  const currentPage = visibleRows > 0
+    ? Math.floor(selectedIndex / visibleRows) + 1
+    : 1;
+
   return (
     <div class="table-panel">
       <div class="table-header">
         <div class="table-col col-name" onClick={() => handleHeaderClick("name")}>
           Name {sortIndicator("name")}
+        </div>
+        <div class="table-col col-type" onClick={() => handleHeaderClick("type")}>
+          Type {sortIndicator("type")}
         </div>
         <div class="table-col col-path" onClick={() => handleHeaderClick("path")}>
           Path {sortIndicator("path")}
@@ -51,7 +67,7 @@ export function TablePanel({ results, selectedIndex, multiSelected, sortColumn, 
           Modified {sortIndicator("date_modified")}
         </div>
       </div>
-      <div class="table-body">
+      <div class="table-body" ref={bodyRef}>
         {results.length === 0 ? (
           <div class="table-empty">No file results</div>
         ) : (
@@ -66,6 +82,7 @@ export function TablePanel({ results, selectedIndex, multiSelected, sortColumn, 
                 <span class="table-icon">{getFileIcon(r.title)}</span>
                 {r.title}
               </div>
+              <div class="table-col col-type">{getExtension(r.title)}</div>
               <div class="table-col col-path">{getParentPath(r.subtitle)}</div>
               <div class="table-col col-size">{formatSize(r.size)}</div>
               <div class="table-col col-date">{formatDate(r.date_modified)}</div>
@@ -73,6 +90,11 @@ export function TablePanel({ results, selectedIndex, multiSelected, sortColumn, 
           ))
         )}
       </div>
+      {results.length > 0 && (
+        <div class="table-footer">
+          {results.length} items \u00b7 page {currentPage}/{totalPages}
+        </div>
+      )}
     </div>
   );
 }
@@ -88,6 +110,12 @@ function getFileIcon(filename: string): string {
     json: "{}", html: "<>", css: "#",
   };
   return iconMap[ext] || "\u25CF";
+}
+
+function getExtension(filename: string): string {
+  const dot = filename.lastIndexOf(".");
+  if (dot <= 0) return "\u2014";
+  return filename.substring(dot + 1).toUpperCase();
 }
 
 function getParentPath(fullPath: string): string {

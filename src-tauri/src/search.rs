@@ -155,6 +155,7 @@ pub fn search_table_query(
     // Map frontend sort names to Everything HTTP API sort values.
     let sort = match sort_by {
         "name" => "name",
+        "type" => "extension",
         "path" => "path",
         "size" => "size",
         "date_modified" => "date_modified",
