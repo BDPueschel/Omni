@@ -970,7 +970,15 @@ export function App() {
       if (config.use_system_accent) {
         try {
           const [r, g, b] = await invoke<[number, number, number]>("get_system_accent");
-          document.documentElement.style.setProperty("--accent", `${r}, ${g}, ${b}`);
+          const el = document.documentElement;
+          el.style.setProperty("--accent-03", `rgba(${r}, ${g}, ${b}, 0.03)`);
+          el.style.setProperty("--accent-08", `rgba(${r}, ${g}, ${b}, 0.08)`);
+          el.style.setProperty("--accent-12", `rgba(${r}, ${g}, ${b}, 0.12)`);
+          el.style.setProperty("--accent-15", `rgba(${r}, ${g}, ${b}, 0.15)`);
+          el.style.setProperty("--accent-20", `rgba(${r}, ${g}, ${b}, 0.2)`);
+          el.style.setProperty("--accent-25", `rgba(${r}, ${g}, ${b}, 0.25)`);
+          el.style.setProperty("--accent-50", `rgba(${r}, ${g}, ${b}, 0.5)`);
+          el.style.setProperty("--accent-70", `rgba(${r}, ${g}, ${b}, 0.7)`);
         } catch (e) {
           console.error("Accent color error:", e);
         }

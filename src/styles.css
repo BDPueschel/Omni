@@ -1,5 +1,12 @@
 :root {
-  --accent: 130, 180, 255;
+  --accent-03: rgba(130, 180, 255, 0.03);
+  --accent-08: rgba(130, 180, 255, 0.08);
+  --accent-12: rgba(130, 180, 255, 0.12);
+  --accent-15: rgba(130, 180, 255, 0.15);
+  --accent-20: rgba(130, 180, 255, 0.2);
+  --accent-25: rgba(130, 180, 255, 0.25);
+  --accent-50: rgba(130, 180, 255, 0.5);
+  --accent-70: rgba(130, 180, 255, 0.7);
 }
 
 * {
@@ -119,8 +126,8 @@ html, body {
 }
 
 .result-group.active-group {
-  border-color: rgba(var(--accent), 0.25);
-  background: rgba(var(--accent), 0.03);
+  border-color: var(--accent-25);
+  background: var(--accent-03);
 }
 
 .result-item {
@@ -137,12 +144,12 @@ html, body {
 }
 
 .result-item.multi-selected {
-  background: rgba(var(--accent), 0.08);
-  border-left: 2px solid rgba(var(--accent), 0.5);
+  background: var(--accent-08);
+  border-left: 2px solid var(--accent-50);
 }
 
 .result-item.multi-selected.selected {
-  background: rgba(var(--accent), 0.15);
+  background: var(--accent-15);
 }
 
 .result-icon {
@@ -216,7 +223,7 @@ html, body {
 .context-menu {
   margin: 4px 12px;
   background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(var(--accent), 0.2);
+  border: 1px solid var(--accent-20);
   border-radius: 8px;
   overflow: hidden;
   animation: slideIn 0.1s ease-out;
@@ -255,7 +262,7 @@ html, body {
 
 .context-action:hover,
 .context-action.selected {
-  background: rgba(var(--accent), 0.12);
+  background: var(--accent-12);
   color: #e0e0e0;
 }
 
@@ -371,7 +378,7 @@ html, body {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: rgba(var(--accent), 0.5);
+  color: var(--accent-50);
   margin-bottom: 6px;
 }
 
@@ -418,7 +425,7 @@ html, body {
 }
 
 .panel-active {
-  border-top: 2px solid rgba(var(--accent), 0.5);
+  border-top: 2px solid var(--accent-50);
 }
 
 .panel-inactive {
@@ -455,7 +462,7 @@ html, body {
 .sort-arrow {
   font-size: 9px;
   margin-left: 4px;
-  color: rgba(var(--accent), 0.7);
+  color: var(--accent-70);
 }
 
 .table-body {
@@ -484,12 +491,12 @@ html, body {
 }
 
 .table-row.multi-selected {
-  background: rgba(var(--accent), 0.08);
-  border-left: 2px solid rgba(var(--accent), 0.5);
+  background: var(--accent-08);
+  border-left: 2px solid var(--accent-50);
 }
 
 .table-row.multi-selected.selected {
-  background: rgba(var(--accent), 0.15);
+  background: var(--accent-15);
 }
 
 .table-col {
@@ -545,7 +552,7 @@ html, body {
 }
 
 .col-drag-over {
-  border-left: 2px solid rgba(var(--accent), 0.7);
+  border-left: 2px solid var(--accent-70);
 }
 
 .table-header .table-col {
