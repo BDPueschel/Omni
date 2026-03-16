@@ -961,30 +961,44 @@ export function App() {
     })();
   }, [flatResults.length, leftGrouped.length, query, showHelp, previewData, tableOpen]);
 
-  // Load config on mount: column order + accent color
-  useEffect(() => {
-    invoke<{ table_column_order?: string[]; use_system_accent?: boolean }>("get_config").then(async (config) => {
+  // Apply accent color from config
+  const applyAccentColor = useCallback(async () => {
+    try {
+      const config = await invoke<{ table_column_order?: string[]; use_system_accent?: boolean }>("get_config");
       if (config.table_column_order && config.table_column_order.length === DEFAULT_COLUMN_ORDER.length) {
         setColumnOrder(config.table_column_order as SortColumn[]);
       }
+      const el = document.documentElement;
       if (config.use_system_accent) {
-        try {
-          const [r, g, b] = await invoke<[number, number, number]>("get_system_accent");
-          const el = document.documentElement;
-          el.style.setProperty("--accent-03", `rgba(${r}, ${g}, ${b}, 0.03)`);
-          el.style.setProperty("--accent-08", `rgba(${r}, ${g}, ${b}, 0.08)`);
-          el.style.setProperty("--accent-12", `rgba(${r}, ${g}, ${b}, 0.12)`);
-          el.style.setProperty("--accent-15", `rgba(${r}, ${g}, ${b}, 0.15)`);
-          el.style.setProperty("--accent-20", `rgba(${r}, ${g}, ${b}, 0.2)`);
-          el.style.setProperty("--accent-25", `rgba(${r}, ${g}, ${b}, 0.25)`);
-          el.style.setProperty("--accent-50", `rgba(${r}, ${g}, ${b}, 0.5)`);
-          el.style.setProperty("--accent-70", `rgba(${r}, ${g}, ${b}, 0.7)`);
-        } catch (e) {
-          console.error("Accent color error:", e);
-        }
+        const [r, g, b] = await invoke<[number, number, number]>("get_system_accent");
+        el.style.setProperty("--accent-03", `rgba(${r}, ${g}, ${b}, 0.03)`);
+        el.style.setProperty("--accent-08", `rgba(${r}, ${g}, ${b}, 0.08)`);
+        el.style.setProperty("--accent-12", `rgba(${r}, ${g}, ${b}, 0.12)`);
+        el.style.setProperty("--accent-15", `rgba(${r}, ${g}, ${b}, 0.15)`);
+        el.style.setProperty("--accent-20", `rgba(${r}, ${g}, ${b}, 0.2)`);
+        el.style.setProperty("--accent-25", `rgba(${r}, ${g}, ${b}, 0.25)`);
+        el.style.setProperty("--accent-50", `rgba(${r}, ${g}, ${b}, 0.5)`);
+        el.style.setProperty("--accent-70", `rgba(${r}, ${g}, ${b}, 0.7)`);
+      } else {
+        // Reset to default blue
+        el.style.removeProperty("--accent-03");
+        el.style.removeProperty("--accent-08");
+        el.style.removeProperty("--accent-12");
+        el.style.removeProperty("--accent-15");
+        el.style.removeProperty("--accent-20");
+        el.style.removeProperty("--accent-25");
+        el.style.removeProperty("--accent-50");
+        el.style.removeProperty("--accent-70");
       }
-    }).catch(() => {});
+    } catch (e) {
+      console.error("Config/accent load error:", e);
+    }
   }, []);
+
+  // Load config on mount
+  useEffect(() => {
+    applyAccentColor();
+  }, [applyAccentColor]);
 
   // Listen for backend events
   useEffect(() => {
@@ -1001,6 +1015,7 @@ export function App() {
     });
     const unlistenShown = listen("window-shown", async () => {
       invoke("refresh_apps");
+      applyAccentColor(); // Re-read config in case settings changed
       try {
         const frequent = await invoke<SearchResult[]>("get_frequent_items");
         if (frequent.length > 0) {
