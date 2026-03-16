@@ -9,6 +9,7 @@ interface Config {
   search_engine: string;
   start_with_windows: boolean;
   theme_opacity: number;
+  use_system_accent: boolean;
 }
 
 function Settings() {
@@ -67,6 +68,15 @@ function Settings() {
         <label>Theme opacity ({config.theme_opacity}%)</label>
         <input type="range" min="40" max="100" value={config.theme_opacity}
           onInput={(e) => update("theme_opacity", parseInt((e.target as HTMLInputElement).value))} />
+      </div>
+
+      <div class="setting-row">
+        <label>Accent color</label>
+        <select value={config.use_system_accent ? "system" : "blue"}
+          onChange={(e) => update("use_system_accent", (e.target as HTMLSelectElement).value === "system")}>
+          <option value="blue">Omni Blue</option>
+          <option value="system">Windows System Accent</option>
+        </select>
       </div>
 
       <button class="save-button" onClick={save}>
