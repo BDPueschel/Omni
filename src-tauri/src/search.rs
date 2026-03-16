@@ -553,6 +553,45 @@ pub fn batch_delete(paths: Vec<String>) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+pub fn get_system_accent() -> (u8, u8, u8) {
+    // Read Windows accent color from registry
+    use windows::core::PCWSTR;
+    use windows::Win32::System::Registry::{
+        RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_DWORD,
+    };
+
+    let subkey: Vec<u16> = "SOFTWARE\\Microsoft\\Windows\\DWM\0"
+        .encode_utf16()
+        .collect();
+    let value: Vec<u16> = "AccentColor\0".encode_utf16().collect();
+    let mut data: u32 = 0;
+    let mut size: u32 = 4;
+
+    let result = unsafe {
+        RegGetValueW(
+            HKEY_CURRENT_USER,
+            PCWSTR(subkey.as_ptr()),
+            PCWSTR(value.as_ptr()),
+            RRF_RT_REG_DWORD,
+            None,
+            Some(&mut data as *mut u32 as *mut _),
+            Some(&mut size),
+        )
+    };
+
+    if result.is_ok() {
+        // AccentColor is ABGR format
+        let r = (data & 0xFF) as u8;
+        let g = ((data >> 8) & 0xFF) as u8;
+        let b = ((data >> 16) & 0xFF) as u8;
+        (r, g, b)
+    } else {
+        // Fallback to default blue
+        (130, 180, 255)
+    }
+}
+
 /// Dry-run version for testing — validates the command name without executing.
 pub fn execute_system_command_dry(command: &str) -> Result<(), String> {
     match command {

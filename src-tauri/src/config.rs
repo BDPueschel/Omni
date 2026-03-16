@@ -11,6 +11,8 @@ pub struct OmniConfig {
     pub theme_opacity: u8,
     #[serde(default)]
     pub table_column_order: Option<Vec<String>>,
+    #[serde(default)]
+    pub use_system_accent: bool,
 }
 
 impl Default for OmniConfig {
@@ -22,6 +24,7 @@ impl Default for OmniConfig {
             start_with_windows: true,
             theme_opacity: 80,
             table_column_order: None,
+            use_system_accent: false,
         }
     }
 }

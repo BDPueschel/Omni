@@ -961,11 +961,21 @@ export function App() {
     })();
   }, [flatResults.length, leftGrouped.length, query, showHelp, previewData, tableOpen]);
 
-  // Load column order from config on mount
+  // Load config on mount: column order + accent color
   useEffect(() => {
-    invoke<{ table_column_order?: string[] }>("get_config").then((config) => {
+    invoke<{ table_column_order?: string[]; use_system_accent?: boolean }>("get_config").then(async (config) => {
       if (config.table_column_order && config.table_column_order.length === DEFAULT_COLUMN_ORDER.length) {
         setColumnOrder(config.table_column_order as SortColumn[]);
+      }
+      if (config.use_system_accent) {
+        try {
+          const [r, g, b] = await invoke<[number, number, number]>("get_system_accent");
+          document.documentElement.style.setProperty("--ar", String(r));
+          document.documentElement.style.setProperty("--ag", String(g));
+          document.documentElement.style.setProperty("--ab", String(b));
+        } catch (e) {
+          console.error("Accent color error:", e);
+        }
       }
     }).catch(() => {});
   }, []);

@@ -156,6 +156,7 @@ pub fn run() {
             search::batch_copy_to,
             search::batch_move_to,
             search::batch_delete,
+            search::get_system_accent,
             icons::get_icon,
             preview::preview_file,
             clipboard::get_clipboard_history,
