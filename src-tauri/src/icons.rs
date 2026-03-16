@@ -18,7 +18,11 @@ pub fn get_icon(path: String) -> String {
         }
     }
 
-    let result = extract_icon(&path).unwrap_or_default();
+    // SHGetFileInfoW returns blank icons on MTA threads.
+    // Spawn a dedicated STA thread to do the extraction.
+    let path_clone = path.clone();
+    let handle = std::thread::spawn(move || extract_icon(&path_clone));
+    let result = handle.join().ok().flatten().unwrap_or_default();
 
     // Only cache successful results — failed extractions may succeed on retry
     if !result.is_empty() {
@@ -38,11 +42,11 @@ fn extract_icon(path: &str) -> Option<String> {
     use windows::Win32::UI::Shell::{SHGetFileInfoW, SHFILEINFOW, SHGFI_ICON, SHGFI_LARGEICON, SHGFI_USEFILEATTRIBUTES};
     use windows::Win32::UI::WindowsAndMessaging::{DestroyIcon, GetIconInfo, ICONINFO};
 
-    // Ensure COM is initialized on this thread (required for shell icon extraction)
+    // SHGetFileInfoW requires COM initialized as STA — MTA threads get blank icons
     unsafe {
         let _ = windows::Win32::System::Com::CoInitializeEx(
             None,
-            windows::Win32::System::Com::COINIT_MULTITHREADED,
+            windows::Win32::System::Com::COINIT_APARTMENTTHREADED,
         );
     }
 

@@ -9,6 +9,7 @@ import type { FilePreview } from "./components/PreviewPanel";
 import { TablePanel } from "./components/TablePanel";
 import type { TableResult, SortColumn } from "./components/TablePanel";
 import { DEFAULT_COLUMN_ORDER } from "./components/TablePanel";
+import { SettingsPanel } from "./components/SettingsPanel";
 
 interface SearchResult {
   category: string;
@@ -58,6 +59,7 @@ export function App() {
   const [contextMenuIndex, setContextMenuIndex] = useState<number | null>(null);
   const [contextActionIndex, setContextActionIndex] = useState(0);
   const [showHelp, setShowHelp] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [previewData, setPreviewData] = useState<FilePreview | null>(null);
   const [completionCandidates, setCompletionCandidates] = useState<string[]>([]);
   const [completionIndex, setCompletionIndex] = useState(0);
@@ -817,6 +819,12 @@ export function App() {
             setShowHelp((v) => !v);
           }
           break;
+        case ",":
+          if (e.ctrlKey) {
+            e.preventDefault();
+            setShowSettings((v) => !v);
+          }
+          break;
         case "f":
         case "F":
           if (e.ctrlKey) {
@@ -847,7 +855,9 @@ export function App() {
           break;
         case "Escape":
           e.preventDefault();
-          if (multiSelected.size > 0) {
+          if (showSettings) {
+            setShowSettings(false);
+          } else if (multiSelected.size > 0) {
             setMultiSelected(new Set());
           } else if (showHelp) {
             setShowHelp(false);
@@ -860,7 +870,7 @@ export function App() {
           break;
       }
     },
-    [flatResults, selectedIndex, leftGrouped, executeResult, expandCategory, expandedCategory, query, contextMenuIndex, contextActionIndex, executeContextAction, showHelp, previewData, completionCandidates, completionIndex, multiSelected, tableOpen, activePanel, tableSelectedIndex, tableResults, tableMultiSelected, toggleTable, fetchTableResults]
+    [flatResults, selectedIndex, leftGrouped, executeResult, expandCategory, expandedCategory, query, contextMenuIndex, contextActionIndex, executeContextAction, showHelp, showSettings, previewData, completionCandidates, completionIndex, multiSelected, tableOpen, activePanel, tableSelectedIndex, tableResults, tableMultiSelected, toggleTable, fetchTableResults]
   );
 
   // Scroll selected item into view with padding for group headers
@@ -1025,6 +1035,9 @@ export function App() {
         console.error("Frequent items error:", e);
       }
     });
+    const unlistenSettings = listen("open-settings", () => {
+      setShowSettings(true);
+    });
     const unlistenSelect = listen("select-query", () => {
       const input = document.querySelector(".omni-input") as HTMLInputElement | null;
       if (input) {
@@ -1048,6 +1061,7 @@ export function App() {
       unlistenClear.then((fn) => fn());
       unlistenShown.then((fn) => fn());
       unlistenSelect.then((fn) => fn());
+      unlistenSettings.then((fn) => fn());
       window.removeEventListener("keydown", suppressAltMenu, true);
       window.removeEventListener("keyup", suppressAltMenu, true);
     };
@@ -1211,6 +1225,7 @@ export function App() {
               <div class="help-row"><kbd>Ctrl+Space</kbd><span>Preview file</span></div>
               <div class="help-row"><kbd>Escape</kbd><span>Collapse / hide</span></div>
               <div class="help-row"><kbd>Ctrl+H</kbd><span>Toggle this help</span></div>
+              <div class="help-row"><kbd>Ctrl+,</kbd><span>Settings</span></div>
             </div>
           </div>
           <div class="help-grid" style="margin-top: 10px;">
@@ -1248,6 +1263,7 @@ export function App() {
               : flatResults[selectedIndex]?.subtitle || ""}
         </div>
       )}
+      <SettingsPanel visible={showSettings} onDismiss={() => setShowSettings(false)} />
     </div>
   );
 }

@@ -29,6 +29,7 @@ function Settings() {
 
   const save = async () => {
     await invoke("save_config", { config });
+    await invoke("update_tray_icon");
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };

@@ -4,6 +4,7 @@ pub mod config;
 pub mod icons;
 pub mod preview;
 pub mod providers;
+pub mod recolor;
 pub mod search;
 pub mod usage;
 
@@ -12,6 +13,25 @@ use providers::apps::AppProvider;
 use search::AppState;
 use std::sync::Mutex;
 use tauri::{Emitter, Manager};
+
+#[tauri::command]
+fn update_tray_icon(app: tauri::AppHandle) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let config = state.config.lock().unwrap().clone();
+
+    let default_icon = app.default_window_icon().unwrap().clone();
+    let icon = if config.use_system_accent {
+        let accent = search::get_system_accent();
+        recolor::recolored_tray_icon(&default_icon, accent)
+    } else {
+        default_icon
+    };
+
+    if let Some(tray) = app.tray_by_id("main") {
+        tray.set_icon(Some(icon)).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -94,10 +114,20 @@ pub fn run() {
 
             let menu = Menu::with_items(app, &[&show_item, &settings_item, &quit_item])?;
 
+            // Determine tray icon — recolor if system accent is enabled
+            let default_icon = app.default_window_icon().unwrap().clone();
+            let use_accent = app.state::<AppState>().config.lock().unwrap().use_system_accent;
+            let tray_icon = if use_accent {
+                let accent = search::get_system_accent();
+                recolor::recolored_tray_icon(&default_icon, accent)
+            } else {
+                default_icon
+            };
+
             let win_tray = window.clone();
-            TrayIconBuilder::new()
+            TrayIconBuilder::with_id("main")
                 .tooltip("Omni — Alt+Space")
-                .icon(app.default_window_icon().unwrap().clone())
+                .icon(tray_icon)
                 .menu(&menu)
                 .on_menu_event(move |app, event| match event.id.as_ref() {
                     "show" => {
@@ -105,10 +135,9 @@ pub fn run() {
                         let _ = win_tray.set_focus();
                     }
                     "settings" => {
-                        if let Some(settings_win) = app.get_webview_window("settings") {
-                            let _ = settings_win.show();
-                            let _ = settings_win.set_focus();
-                        }
+                        let _ = win_tray.show();
+                        let _ = win_tray.set_focus();
+                        let _ = win_tray.emit("open-settings", ());
                     }
                     "quit" => {
                         app.exit(0);
@@ -163,6 +192,7 @@ pub fn run() {
             clipboard::delete_clipboard_entry,
             clipboard::pin_clipboard_entry,
             clipboard::clear_clipboard_history,
+            update_tray_icon,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
