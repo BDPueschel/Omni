@@ -35,8 +35,16 @@ fn extract_icon(path: &str) -> Option<String> {
         CreateCompatibleDC, DeleteDC, DeleteObject, GetDIBits, GetObjectW, SelectObject, BITMAP,
         BITMAPINFO, BITMAPINFOHEADER, DIB_RGB_COLORS, RGBQUAD,
     };
-    use windows::Win32::UI::Shell::{SHGetFileInfoW, SHFILEINFOW, SHGFI_ICON, SHGFI_LARGEICON};
+    use windows::Win32::UI::Shell::{SHGetFileInfoW, SHFILEINFOW, SHGFI_ICON, SHGFI_LARGEICON, SHGFI_USEFILEATTRIBUTES};
     use windows::Win32::UI::WindowsAndMessaging::{DestroyIcon, GetIconInfo, ICONINFO};
+
+    // Ensure COM is initialized on this thread (required for shell icon extraction)
+    unsafe {
+        let _ = windows::Win32::System::Com::CoInitializeEx(
+            None,
+            windows::Win32::System::Com::COINIT_MULTITHREADED,
+        );
+    }
 
     let wide_path: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
 
@@ -52,7 +60,20 @@ fn extract_icon(path: &str) -> Option<String> {
     };
 
     if result == 0 || shfi.hIcon.is_invalid() {
-        return None;
+        // Fallback: use file attributes (doesn't need file access, gives generic icon by type)
+        shfi = SHFILEINFOW::default();
+        let fallback = unsafe {
+            SHGetFileInfoW(
+                PCWSTR(wide_path.as_ptr()),
+                windows::Win32::Storage::FileSystem::FILE_ATTRIBUTE_NORMAL,
+                Some(&mut shfi),
+                std::mem::size_of::<SHFILEINFOW>() as u32,
+                SHGFI_ICON | SHGFI_LARGEICON | SHGFI_USEFILEATTRIBUTES,
+            )
+        };
+        if fallback == 0 || shfi.hIcon.is_invalid() {
+            return None;
+        }
     }
 
     let icon = shfi.hIcon;
