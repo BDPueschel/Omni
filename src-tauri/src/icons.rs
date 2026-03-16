@@ -20,8 +20,8 @@ pub fn get_icon(path: String) -> String {
 
     let result = extract_icon(&path).unwrap_or_default();
 
-    // Cache the result
-    {
+    // Only cache successful results — failed extractions may succeed on retry
+    if !result.is_empty() {
         let mut cache = get_cache().lock().unwrap();
         cache.insert(path, result.clone());
     }
