@@ -9,6 +9,10 @@ pub struct OmniConfig {
     pub search_engine: String,
     pub start_with_windows: bool,
     pub theme_opacity: u8,
+    #[serde(default)]
+    pub table_column_order: Option<Vec<String>>,
+    #[serde(default)]
+    pub use_system_accent: bool,
 }
 
 impl Default for OmniConfig {
@@ -19,6 +23,8 @@ impl Default for OmniConfig {
             search_engine: "google".to_string(),
             start_with_windows: true,
             theme_opacity: 80,
+            table_column_order: None,
+            use_system_accent: false,
         }
     }
 }

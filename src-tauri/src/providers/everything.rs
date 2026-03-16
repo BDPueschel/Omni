@@ -15,6 +15,20 @@ pub enum EverythingStatus {
 
 // --- HTTP API response types ---
 
+/// Deserialize a JSON value that may be a number or a string containing a number.
+fn deserialize_string_u64<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::Deserialize;
+    let val: Option<serde_json::Value> = Option::deserialize(deserializer)?;
+    match val {
+        Some(serde_json::Value::Number(n)) => Ok(n.as_u64()),
+        Some(serde_json::Value::String(s)) => Ok(s.parse::<u64>().ok()),
+        _ => Ok(None),
+    }
+}
+
 #[derive(Debug, serde::Deserialize)]
 struct EverythingHttpResult {
     #[serde(rename = "type")]
@@ -22,6 +36,10 @@ struct EverythingHttpResult {
     name: String,
     #[serde(default)]
     path: String,
+    #[serde(default, deserialize_with = "deserialize_string_u64")]
+    size: Option<u64>,
+    #[serde(default, deserialize_with = "deserialize_string_u64")]
+    date_modified: Option<u64>,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -30,6 +48,16 @@ struct EverythingResponse {
     #[allow(dead_code)]
     total_results: u64,
     results: Vec<EverythingHttpResult>,
+}
+
+/// Convert Windows FILETIME (100-ns intervals since 1601-01-01) to Unix epoch seconds.
+pub fn filetime_to_unix(ft: u64) -> u64 {
+    // Difference between 1601-01-01 and 1970-01-01 in 100-ns intervals
+    const EPOCH_DIFF: u64 = 116444736000000000;
+    if ft <= EPOCH_DIFF {
+        return 0;
+    }
+    (ft - EPOCH_DIFF) / 10_000_000
 }
 
 pub struct EverythingProvider;
@@ -113,7 +141,7 @@ impl EverythingProvider {
         };
 
         let url = format!(
-            "/?s={}&c={}&j=1&path_column=1&sort={}&ascending={}",
+            "/?s={}&c={}&j=1&path_column=1&size_column=1&date_modified_column=1&sort={}&ascending={}",
             encoded_query,
             max_results,
             sort,
@@ -255,7 +283,7 @@ impl EverythingProvider {
 
     /// Build the Everything search query string, handling path context, regex, and raw operators.
     /// Returns the processed query string for the HTTP API.
-    fn build_http_query(query: &str) -> String {
+    pub fn build_http_query(query: &str) -> String {
         // Regex mode: pass regex: prefix through to Everything
         if let Some(pattern) = Self::parse_regex_prefix(query) {
             return format!("regex:{}", pattern);
@@ -324,6 +352,8 @@ impl EverythingProvider {
                 url: "https://www.voidtools.com/downloads/".to_string(),
             },
             icon: "alert".to_string(),
+            size: None,
+            date_modified: None,
         }]
     }
 
@@ -361,6 +391,8 @@ impl EverythingProvider {
                                 path: full_path,
                             },
                             icon: "folder".to_string(),
+                            size: r.size,
+                            date_modified: r.date_modified.map(filetime_to_unix),
                         });
                     } else if r.result_type == "file" && files.len() < max_per_type {
                         let filename = Path::new(&full_path)
@@ -376,6 +408,8 @@ impl EverythingProvider {
                                 path: full_path,
                             },
                             icon: "file".to_string(),
+                            size: r.size,
+                            date_modified: r.date_modified.map(filetime_to_unix),
                         });
                     }
                 }
@@ -388,6 +422,51 @@ impl EverythingProvider {
                 (files, dirs)
             }
         }
+    }
+
+    /// Public entry point for table panel — returns formatted file/dir results with metadata.
+    pub fn query_http_public(
+        query: &str,
+        max_results: usize,
+        sort: &str,
+        ascending: bool,
+    ) -> Result<Vec<SearchResult>, String> {
+        let response = Self::query_http(query, max_results, sort, ascending)?;
+        let mut results = Vec::new();
+        for r in response.results {
+            let full_path = if r.path.is_empty() {
+                r.name.clone()
+            } else {
+                format!("{}\\{}", r.path, r.name)
+            };
+            let filename = std::path::Path::new(&full_path)
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
+            if r.result_type == "folder" {
+                results.push(SearchResult {
+                    category: "Directories".to_string(),
+                    title: filename,
+                    subtitle: full_path.clone(),
+                    action: ResultAction::OpenFile { path: full_path },
+                    icon: "folder".to_string(),
+                    size: r.size,
+                    date_modified: r.date_modified.map(filetime_to_unix),
+                });
+            } else {
+                results.push(SearchResult {
+                    category: "Files".to_string(),
+                    title: filename,
+                    subtitle: full_path.clone(),
+                    action: ResultAction::OpenFile { path: full_path },
+                    icon: "file".to_string(),
+                    size: r.size,
+                    date_modified: r.date_modified.map(filetime_to_unix),
+                });
+            }
+        }
+        Ok(results)
     }
 
     // ---------------------------------------------------------------
@@ -465,6 +544,8 @@ impl EverythingProvider {
                             subtitle: full_path.clone(),
                             action: ResultAction::LaunchApp { path: full_path },
                             icon: "app".to_string(),
+                            size: None,
+                            date_modified: None,
                         });
                     }
                     if results.len() >= max_results {
@@ -601,6 +682,8 @@ impl EverythingProvider {
                     subtitle: full_path.clone(),
                     action: ResultAction::OpenFile { path: full_path },
                     icon: "file".to_string(),
+                    size: r.size,
+                    date_modified: r.date_modified.map(filetime_to_unix),
                 }
             })
             .collect()
@@ -626,6 +709,8 @@ impl EverythingProvider {
                     subtitle: full_path.clone(),
                     action: ResultAction::OpenFile { path: full_path },
                     icon: "folder".to_string(),
+                    size: r.size,
+                    date_modified: r.date_modified.map(filetime_to_unix),
                 }
             })
             .collect()
@@ -646,6 +731,8 @@ impl EverythingProvider {
                     subtitle: path.clone(),
                     action: ResultAction::OpenFile { path },
                     icon: "file".to_string(),
+                    size: None,
+                    date_modified: None,
                 }
             })
             .collect()
@@ -666,6 +753,8 @@ impl EverythingProvider {
                     subtitle: path.clone(),
                     action: ResultAction::LaunchApp { path },
                     icon: "app".to_string(),
+                    size: None,
+                    date_modified: None,
                 }
             })
             .collect()
@@ -686,6 +775,8 @@ impl EverythingProvider {
                     subtitle: path.clone(),
                     action: ResultAction::OpenFile { path },
                     icon: "folder".to_string(),
+                    size: None,
+                    date_modified: None,
                 }
             })
             .collect()

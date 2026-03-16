@@ -268,6 +268,8 @@ impl UnitProvider {
                 text: format_number(result),
             },
             icon: "unit".to_string(),
+            size: None,
+            date_modified: None,
         }]
     }
 }

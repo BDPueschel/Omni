@@ -1,4 +1,19 @@
-use omni_lib::providers::everything::{EverythingProvider, EverythingStatus};
+use omni_lib::providers::everything::{filetime_to_unix, EverythingProvider, EverythingStatus};
+
+#[test]
+fn test_filetime_to_unix_epoch() {
+    // 2024-01-01 00:00:00 UTC = FILETIME 133485408000000000
+    let ft: u64 = 133485408000000000;
+    let epoch = filetime_to_unix(ft);
+    assert_eq!(epoch, 1704067200);
+}
+
+#[test]
+fn test_filetime_to_unix_epoch_zero() {
+    // FILETIME before Unix epoch should clamp to 0
+    let epoch = filetime_to_unix(0);
+    assert_eq!(epoch, 0);
+}
 
 #[test]
 fn test_status_detection_when_missing() {

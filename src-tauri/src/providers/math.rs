@@ -63,6 +63,8 @@ impl MathProvider {
                     subtitle: format!("{} =", input.trim()),
                     action: ResultAction::Copy { text: formatted },
                     icon: "calculator".to_string(),
+                    size: None,
+                    date_modified: None,
                 }]
             }
             Err(_) => vec![],

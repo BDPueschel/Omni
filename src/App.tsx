@@ -6,6 +6,10 @@ import { ResultGroup } from "./components/ResultGroup";
 import { ContextMenu, getActions } from "./components/ContextMenu";
 import { PreviewPanel } from "./components/PreviewPanel";
 import type { FilePreview } from "./components/PreviewPanel";
+import { TablePanel } from "./components/TablePanel";
+import type { TableResult, SortColumn } from "./components/TablePanel";
+import { DEFAULT_COLUMN_ORDER } from "./components/TablePanel";
+import { SettingsPanel } from "./components/SettingsPanel";
 
 interface SearchResult {
   category: string;
@@ -13,6 +17,8 @@ interface SearchResult {
   subtitle: string;
   action: any;
   icon: string;
+  size?: number;
+  date_modified?: number;
 }
 
 function BatchContextMenu({ count, selectedAction, onExecute }: { count: number; selectedAction: number; onExecute: (i: number) => void }) {
@@ -53,10 +59,21 @@ export function App() {
   const [contextMenuIndex, setContextMenuIndex] = useState<number | null>(null);
   const [contextActionIndex, setContextActionIndex] = useState(0);
   const [showHelp, setShowHelp] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [previewData, setPreviewData] = useState<FilePreview | null>(null);
   const [completionCandidates, setCompletionCandidates] = useState<string[]>([]);
   const [completionIndex, setCompletionIndex] = useState(0);
   const [multiSelected, setMultiSelected] = useState<Set<number>>(new Set());
+  const [tableOpen, setTableOpen] = useState(false);
+  const [activePanel, setActivePanel] = useState<"results" | "table">("results");
+  const [tableSelectedIndex, setTableSelectedIndex] = useState(0);
+  const [tableResults, setTableResults] = useState<TableResult[]>([]);
+  const [tableMultiSelected, setTableMultiSelected] = useState<Set<number>>(new Set());
+  const [tableSortColumn, setTableSortColumn] = useState<SortColumn>("date_modified");
+  const [tableSortAscending, setTableSortAscending] = useState(false);
+  const [tableContextResult, setTableContextResult] = useState<SearchResult | null>(null);
+  const [columnOrder, setColumnOrder] = useState<SortColumn[]>([...DEFAULT_COLUMN_ORDER]);
+  const [originalWindowPos, setOriginalWindowPos] = useState<{ x: number; y: number } | null>(null);
   const debounceRef = useRef<number | null>(null);
 
   const grouped = CATEGORY_ORDER.map((cat) => ({
@@ -64,7 +81,62 @@ export function App() {
     results: results.filter((r) => r.category === cat),
   })).filter((g) => g.results.length > 0);
 
-  const flatResults = grouped.flatMap((g) => g.results);
+  // When table is open, filter Files/Directories from the left panel (they live in the table)
+  const leftGrouped = tableOpen
+    ? grouped.filter(g => g.category !== "Files" && g.category !== "Directories")
+    : grouped;
+
+  const flatResults = leftGrouped.flatMap((g) => g.results);
+
+  const saveColumnOrder = useCallback(async (newOrder: SortColumn[]) => {
+    setColumnOrder(newOrder);
+    try {
+      const config = await invoke<Record<string, any>>("get_config");
+      config.table_column_order = newOrder;
+      await invoke("save_config", { config });
+    } catch (e) {
+      console.error("Save column order error:", e);
+    }
+  }, []);
+
+  const fetchTableResults = useCallback(async (q: string, sortBy = "date_modified", asc = false) => {
+    if (!q.trim()) return;
+    try {
+      const res = await invoke<TableResult[]>("search_table", { query: q, sortBy, ascending: asc });
+      setTableResults(res);
+      setTableSelectedIndex(0);
+      setTableMultiSelected(new Set());
+    } catch (e) {
+      console.error("Table search error:", e);
+    }
+  }, []);
+
+  const toggleTable = useCallback(async () => {
+    if (tableOpen) {
+      // Close table — restore position
+      setTableOpen(false);
+      setActivePanel("results");
+      setTableMultiSelected(new Set());
+      if (originalWindowPos) {
+        try {
+          const { getCurrentWindow } = await import("@tauri-apps/api/window");
+          const { LogicalPosition } = await import("@tauri-apps/api/dpi");
+          const win = getCurrentWindow();
+          await win.setPosition(new LogicalPosition(originalWindowPos.x, originalWindowPos.y));
+          setOriginalWindowPos(null);
+        } catch (e) {
+          console.error("Table close error:", e);
+        }
+      }
+    } else {
+      // Open table — resize effect handles the window sizing
+      const hasFileResults = results.some(r => r.category === "Files" || r.category === "Directories");
+      if (!hasFileResults) return;
+      setTableOpen(true);
+      setActivePanel("table");
+      fetchTableResults(query);
+    }
+  }, [tableOpen, results, query, originalWindowPos, fetchTableResults]);
 
   const handleInput = useCallback((value: string) => {
     setQuery(value);
@@ -82,6 +154,9 @@ export function App() {
     }
 
     if (!value.trim()) {
+      if (tableOpen) {
+        toggleTable();
+      }
       // Show frequent items when query is cleared
       invoke<SearchResult[]>("get_frequent_items")
         .then((frequent) => setResults(frequent.length > 0 ? frequent : []))
@@ -93,11 +168,23 @@ export function App() {
       try {
         const res = await invoke<SearchResult[]>("search", { query: value });
         setResults(res);
+        // Auto-open table if results contain files/directories
+        const hasFiles = res.some(r => r.category === "Files" || r.category === "Directories");
+        if (hasFiles && !tableOpen) {
+          // Open table without the full toggleTable resize dance — just fetch and show
+          setTableOpen(true);
+          fetchTableResults(value);
+        } else if (hasFiles && tableOpen) {
+          fetchTableResults(value);
+        } else if (!hasFiles && tableOpen) {
+          setTableOpen(false);
+          setActivePanel("results");
+        }
       } catch (e) {
         console.error("Search error:", e);
       }
     }, 50);
-  }, []);
+  }, [tableOpen, fetchTableResults, toggleTable]);
 
   const DESTRUCTIVE_COMMANDS = ["shutdown", "restart", "sign_out"];
 
@@ -150,14 +237,14 @@ export function App() {
   // Find which category the selected index belongs to
   const getSelectedCategory = useCallback((): string | null => {
     let count = 0;
-    for (const g of grouped) {
+    for (const g of leftGrouped) {
       if (count + g.results.length > selectedIndex) {
         return g.category;
       }
       count += g.results.length;
     }
     return null;
-  }, [grouped, selectedIndex]);
+  }, [leftGrouped, selectedIndex]);
 
   const expandCategory = useCallback(async () => {
     const cat = getSelectedCategory();
@@ -264,7 +351,8 @@ export function App() {
       // Context menu is open — handle its navigation
       if (contextMenuIndex !== null) {
         const isBatch = contextMenuIndex === -1;
-        const result = isBatch ? null : flatResults[contextMenuIndex];
+        const isTableContext = contextMenuIndex === -2;
+        const result = isTableContext ? tableContextResult : (isBatch ? null : flatResults[contextMenuIndex]);
         const actionCount = isBatch ? 5 : (result ? getActions(result).length : 0);
 
         switch (e.key) {
@@ -299,6 +387,14 @@ export function App() {
               setContextMenuIndex(null);
               setContextActionIndex(0);
               setMultiSelected(new Set());
+            } else if (isTableContext && tableContextResult) {
+              const actions = getActions(tableContextResult);
+              if (contextActionIndex >= 0 && contextActionIndex < actions.length) {
+                actions[contextActionIndex].handler();
+              }
+              setContextMenuIndex(null);
+              setContextActionIndex(0);
+              setTableContextResult(null);
             } else {
               executeContextAction(contextActionIndex);
             }
@@ -308,12 +404,194 @@ export function App() {
               e.preventDefault();
               setContextMenuIndex(null);
               setContextActionIndex(0);
+              setTableContextResult(null);
             }
             return;
           case "Escape":
             e.preventDefault();
             setContextMenuIndex(null);
             setContextActionIndex(0);
+            setTableContextResult(null);
+            return;
+          default:
+            return;
+        }
+      }
+
+      // Table panel is focused — handle its navigation
+      if (tableOpen && activePanel === "table") {
+        switch (e.key) {
+          case "ArrowDown":
+            e.preventDefault();
+            if (e.shiftKey) {
+              setTableMultiSelected(prev => new Set([...prev, tableSelectedIndex]));
+            }
+            if (e.ctrlKey) {
+              // Jump to last visible row (page-down style)
+              const body = document.querySelector(".table-body") as HTMLElement | null;
+              if (body) {
+                const visibleRows = Math.floor(body.clientHeight / 27); // ~27px per row
+                setTableSelectedIndex(i => Math.min(i + visibleRows, tableResults.length - 1));
+              } else {
+                setTableSelectedIndex(tableResults.length - 1);
+              }
+            } else {
+              setTableSelectedIndex(i => Math.min(i + 1, tableResults.length - 1));
+            }
+            return;
+          case "ArrowUp":
+            e.preventDefault();
+            if (e.shiftKey) {
+              setTableMultiSelected(prev => new Set([...prev, tableSelectedIndex]));
+            }
+            if (e.ctrlKey) {
+              // Jump up a page
+              const body = document.querySelector(".table-body") as HTMLElement | null;
+              if (body) {
+                const visibleRows = Math.floor(body.clientHeight / 27);
+                setTableSelectedIndex(i => Math.max(i - visibleRows, 0));
+              } else {
+                setTableSelectedIndex(0);
+              }
+            } else {
+              setTableSelectedIndex(i => Math.max(i - 1, 0));
+            }
+            return;
+          case "PageDown":
+            e.preventDefault();
+            {
+              const body = document.querySelector(".table-body") as HTMLElement | null;
+              const visibleRows = body ? Math.floor(body.clientHeight / 27) : 20;
+              setTableSelectedIndex(i => Math.min(i + visibleRows, tableResults.length - 1));
+            }
+            return;
+          case "PageUp":
+            e.preventDefault();
+            {
+              const body = document.querySelector(".table-body") as HTMLElement | null;
+              const visibleRows = body ? Math.floor(body.clientHeight / 27) : 20;
+              setTableSelectedIndex(i => Math.max(i - visibleRows, 0));
+            }
+            return;
+          case "Home":
+            e.preventDefault();
+            setTableSelectedIndex(0);
+            return;
+          case "End":
+            e.preventDefault();
+            setTableSelectedIndex(tableResults.length - 1);
+            return;
+          case "Enter":
+            e.preventDefault();
+            if (tableMultiSelected.size > 0) {
+              const indices = new Set([...tableMultiSelected, tableSelectedIndex]);
+              const paths = [...indices].map(i => tableResults[i]?.subtitle).filter(Boolean);
+              invoke("batch_open", { paths });
+              setTableMultiSelected(new Set());
+            } else {
+              const tr = tableResults[tableSelectedIndex];
+              if (tr) {
+                invoke("execute_action", { action: tr.action });
+                invoke("record_selection", { query, resultPath: tr.subtitle, category: tr.category, title: tr.title });
+              }
+            }
+            return;
+          case "ArrowRight":
+            if (e.ctrlKey && e.shiftKey) {
+              // Ctrl+Shift+Right: move sorted column one position right
+              e.preventDefault();
+              const colIdx = columnOrder.indexOf(tableSortColumn);
+              if (colIdx < columnOrder.length - 1) {
+                const newOrder = [...columnOrder];
+                [newOrder[colIdx], newOrder[colIdx + 1]] = [newOrder[colIdx + 1], newOrder[colIdx]];
+                saveColumnOrder(newOrder);
+              }
+            } else if (e.shiftKey && tableResults.length > 0) {
+              e.preventDefault();
+              const tr = tableResults[tableSelectedIndex];
+              if (tr) {
+                setTableContextResult(tr as SearchResult);
+                setContextMenuIndex(-2);
+                setContextActionIndex(0);
+              }
+            }
+            return;
+          case "ArrowLeft":
+            if (e.ctrlKey && e.shiftKey) {
+              // Ctrl+Shift+Left: move sorted column one position left
+              e.preventDefault();
+              const colIdx = columnOrder.indexOf(tableSortColumn);
+              if (colIdx > 0) {
+                const newOrder = [...columnOrder];
+                [newOrder[colIdx - 1], newOrder[colIdx]] = [newOrder[colIdx], newOrder[colIdx - 1]];
+                saveColumnOrder(newOrder);
+              }
+            } else if (e.ctrlKey) {
+              // Ctrl+Left: jump focus back to result list
+              e.preventDefault();
+              setActivePanel("results");
+              setTableMultiSelected(new Set());
+            }
+            return;
+          case " ":
+            if (e.ctrlKey) {
+              e.preventDefault();
+              if (previewData) {
+                setPreviewData(null);
+              } else {
+                const tr = tableResults[tableSelectedIndex];
+                if (tr) {
+                  invoke<FilePreview>("preview_file", { path: tr.subtitle })
+                    .then(preview => setPreviewData(preview))
+                    .catch(err => console.error("Preview error:", err));
+                }
+              }
+            }
+            return;
+          case "Escape":
+            e.preventDefault();
+            if (showHelp) {
+              setShowHelp(false);
+            } else if (tableMultiSelected.size > 0) {
+              setTableMultiSelected(new Set());
+            } else {
+              toggleTable();
+            }
+            return;
+          case "h": case "H":
+            if (e.ctrlKey) {
+              e.preventDefault();
+              setShowHelp(v => !v);
+            }
+            return;
+          case "1": case "2": case "3": case "4": case "5":
+            if (e.ctrlKey) {
+              e.preventDefault();
+              const col = columnOrder[parseInt(e.key) - 1];
+              // Toggle direction if same column, else use default for that column
+              const asc = col === tableSortColumn
+                ? !tableSortAscending
+                : (col === "name" || col === "path" || col === "type");
+              setTableSortColumn(col);
+              setTableSortAscending(asc);
+              fetchTableResults(query, col, asc);
+            }
+            return;
+          case "t": case "T":
+            if (e.ctrlKey) {
+              e.preventDefault();
+              toggleTable();
+            }
+            return;
+          case "Tab":
+            if (e.ctrlKey) {
+              e.preventDefault();
+              setActivePanel("results");
+              setTableMultiSelected(new Set());
+            }
+            return;
+          case "f": case "F":
+            if (e.ctrlKey) e.preventDefault(); // suppress Chromium "Find in page"
             return;
           default:
             return;
@@ -323,7 +601,7 @@ export function App() {
       // Helper: find start/end index of current category group
       const getCategoryBounds = () => {
         let start = 0;
-        for (const g of grouped) {
+        for (const g of leftGrouped) {
           const end = start + g.results.length - 1;
           if (selectedIndex >= start && selectedIndex <= end) {
             return { start, end };
@@ -337,7 +615,7 @@ export function App() {
       const getNextCategoryStart = () => {
         let start = 0;
         let foundCurrent = false;
-        for (const g of grouped) {
+        for (const g of leftGrouped) {
           if (foundCurrent) return start;
           const end = start + g.results.length - 1;
           if (selectedIndex >= start && selectedIndex <= end) {
@@ -351,7 +629,7 @@ export function App() {
       const getPrevCategoryEnd = () => {
         let start = 0;
         let prevEnd = 0;
-        for (const g of grouped) {
+        for (const g of leftGrouped) {
           const end = start + g.results.length - 1;
           if (selectedIndex >= start && selectedIndex <= end) {
             return prevEnd > 0 ? prevEnd : 0;
@@ -442,6 +720,11 @@ export function App() {
                 setContextActionIndex(0);
               }
             }
+          } else if (e.ctrlKey && tableOpen) {
+            // Ctrl+Right: jump focus to table panel
+            e.preventDefault();
+            setActivePanel("table");
+            setMultiSelected(new Set());
           }
           break;
         case "Enter":
@@ -457,6 +740,16 @@ export function App() {
           }
           break;
         case "Tab":
+          if (e.ctrlKey && tableOpen) {
+            e.preventDefault();
+            setActivePanel(p => p === "results" ? "table" : "results");
+            if (activePanel === "results") {
+              setMultiSelected(new Set());
+            } else {
+              setTableMultiSelected(new Set());
+            }
+            break;
+          }
           e.preventDefault();
           // Path completion: if query looks like a path
           if (/^[a-zA-Z]:[\\\/]/.test(query) || query.startsWith("\\\\")) {
@@ -481,17 +774,17 @@ export function App() {
             // Normal category jump
             let currentGroup = 0;
             let count = 0;
-            for (const g of grouped) {
+            for (const g of leftGrouped) {
               if (count + g.results.length > selectedIndex) {
-                currentGroup = grouped.indexOf(g);
+                currentGroup = leftGrouped.indexOf(g);
                 break;
               }
               count += g.results.length;
             }
-            const nextGroup = (currentGroup + 1) % grouped.length;
+            const nextGroup = (currentGroup + 1) % leftGrouped.length;
             let nextIndex = 0;
             for (let i = 0; i < nextGroup; i++) {
-              nextIndex += grouped[i].results.length;
+              nextIndex += leftGrouped[i].results.length;
             }
             setSelectedIndex(nextIndex);
           }
@@ -512,6 +805,10 @@ export function App() {
         case "E":
           if (e.ctrlKey && flatResults.length > 0) {
             e.preventDefault();
+            if (tableOpen) {
+              const cat = getSelectedCategory();
+              if (cat === "Files" || cat === "Directories") break;
+            }
             expandCategory();
           }
           break;
@@ -520,6 +817,18 @@ export function App() {
           if (e.ctrlKey) {
             e.preventDefault();
             setShowHelp((v) => !v);
+          }
+          break;
+        case ",":
+          if (e.ctrlKey) {
+            e.preventDefault();
+            setShowSettings((v) => !v);
+          }
+          break;
+        case "f":
+        case "F":
+          if (e.ctrlKey) {
+            e.preventDefault(); // suppress Chromium "Find in page"
           }
           break;
         case " ":
@@ -537,9 +846,18 @@ export function App() {
             }
           }
           break;
+        case "t":
+        case "T":
+          if (e.ctrlKey) {
+            e.preventDefault();
+            toggleTable();
+          }
+          break;
         case "Escape":
           e.preventDefault();
-          if (multiSelected.size > 0) {
+          if (showSettings) {
+            setShowSettings(false);
+          } else if (multiSelected.size > 0) {
             setMultiSelected(new Set());
           } else if (showHelp) {
             setShowHelp(false);
@@ -552,7 +870,7 @@ export function App() {
           break;
       }
     },
-    [flatResults, selectedIndex, grouped, executeResult, expandCategory, expandedCategory, query, contextMenuIndex, contextActionIndex, executeContextAction, showHelp, previewData, completionCandidates, completionIndex, multiSelected]
+    [flatResults, selectedIndex, leftGrouped, executeResult, expandCategory, expandedCategory, query, contextMenuIndex, contextActionIndex, executeContextAction, showHelp, showSettings, previewData, completionCandidates, completionIndex, multiSelected, tableOpen, activePanel, tableSelectedIndex, tableResults, tableMultiSelected, toggleTable, fetchTableResults]
   );
 
   // Scroll selected item into view with padding for group headers
@@ -580,40 +898,117 @@ export function App() {
     }
   }, [selectedIndex]);
 
+  // Scroll selected table row into view
+  useEffect(() => {
+    if (!tableOpen) return;
+    const el = document.querySelector(".table-row.selected") as HTMLElement | null;
+    const container = document.querySelector(".table-body") as HTMLElement | null;
+    if (!el || !container) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    if (elRect.top < containerRect.top) {
+      container.scrollTop -= (containerRect.top - elRect.top + 4);
+    } else if (elRect.bottom > containerRect.bottom) {
+      container.scrollTop += (elRect.bottom - containerRect.bottom + 4);
+    }
+  }, [tableSelectedIndex, tableOpen]);
+
   // Resize window — anchor top position, only grow downward
   useEffect(() => {
     (async () => {
       try {
         const { getCurrentWindow } = await import("@tauri-apps/api/window");
-        const { LogicalSize } = await import("@tauri-apps/api/dpi");
+        const { LogicalSize, LogicalPosition } = await import("@tauri-apps/api/dpi");
         const win = getCurrentWindow();
+        const scale = window.devicePixelRatio || 1;
 
         let targetHeight: number;
         if (previewData) {
           const maxH = window.screen.availHeight * 0.85;
-          targetHeight = Math.min(500, maxH); // preview gets generous height
+          targetHeight = Math.min(500, maxH);
         } else if (showHelp) {
-          targetHeight = 420; // search bar + full help overlay
+          targetHeight = 620;
         } else if (flatResults.length === 0 && !query.trim()) {
-          targetHeight = 52; // no frequent items, just search bar
+          targetHeight = 52;
         } else if (flatResults.length === 0) {
           targetHeight = 110;
         } else {
-          const base = 52 + 44 + 22; // search bar + padding + status bar
-          const groupCost = grouped.length * 38;
+          const base = 52 + 44 + 22;
+          const groupCost = leftGrouped.length * 38;
           const resultCost = flatResults.length * 44;
           targetHeight = base + groupCost + resultCost;
           const maxH = window.screen.availHeight * 0.85;
           targetHeight = Math.min(targetHeight, maxH);
         }
 
-        // Only resize height, don't re-center — keeps search bar anchored
-        await win.setSize(new LogicalSize(600, targetHeight));
+        // Set width based on whether table is open
+        let targetWidth = 600;
+        if (tableOpen) {
+          const maxW = window.screen.availWidth * 0.85 / scale;
+          targetWidth = Math.min(1200, maxW);
+          targetHeight = Math.max(targetHeight, 400); // table needs minimum height
+
+          // Save position if not already saved, and shift left if needed
+          if (!originalWindowPos) {
+            const pos = await win.outerPosition();
+            const logicalX = pos.x / scale;
+            const logicalY = pos.y / scale;
+            setOriginalWindowPos({ x: logicalX, y: logicalY });
+
+            const screenW = window.screen.availWidth / scale;
+            if (logicalX + targetWidth > screenW) {
+              const newX = Math.max(0, screenW - targetWidth);
+              await win.setPosition(new LogicalPosition(newX, logicalY));
+            }
+          }
+        }
+
+        await win.setSize(new LogicalSize(targetWidth, targetHeight));
       } catch (e) {
         console.error(`[Omni resize] ERROR:`, e);
       }
     })();
-  }, [flatResults.length, grouped.length, query, showHelp, previewData]);
+  }, [flatResults.length, leftGrouped.length, query, showHelp, previewData, tableOpen]);
+
+  // Apply accent color from config
+  const applyAccentColor = useCallback(async () => {
+    try {
+      const config = await invoke<{ table_column_order?: string[]; use_system_accent?: boolean }>("get_config");
+      if (config.table_column_order && config.table_column_order.length === DEFAULT_COLUMN_ORDER.length) {
+        setColumnOrder(config.table_column_order as SortColumn[]);
+      }
+      const el = document.documentElement;
+      if (config.use_system_accent) {
+        const [r, g, b] = await invoke<[number, number, number]>("get_system_accent");
+        el.style.setProperty("--accent-03", `rgba(${r}, ${g}, ${b}, 0.03)`);
+        el.style.setProperty("--accent-08", `rgba(${r}, ${g}, ${b}, 0.08)`);
+        el.style.setProperty("--accent-12", `rgba(${r}, ${g}, ${b}, 0.12)`);
+        el.style.setProperty("--accent-15", `rgba(${r}, ${g}, ${b}, 0.15)`);
+        el.style.setProperty("--accent-20", `rgba(${r}, ${g}, ${b}, 0.2)`);
+        el.style.setProperty("--accent-25", `rgba(${r}, ${g}, ${b}, 0.25)`);
+        el.style.setProperty("--accent-50", `rgba(${r}, ${g}, ${b}, 0.5)`);
+        el.style.setProperty("--accent-70", `rgba(${r}, ${g}, ${b}, 0.7)`);
+      } else {
+        // Reset to default blue
+        el.style.removeProperty("--accent-03");
+        el.style.removeProperty("--accent-08");
+        el.style.removeProperty("--accent-12");
+        el.style.removeProperty("--accent-15");
+        el.style.removeProperty("--accent-20");
+        el.style.removeProperty("--accent-25");
+        el.style.removeProperty("--accent-50");
+        el.style.removeProperty("--accent-70");
+      }
+    } catch (e) {
+      console.error("Config/accent load error:", e);
+    }
+  }, []);
+
+  // Load config on mount
+  useEffect(() => {
+    applyAccentColor();
+  }, [applyAccentColor]);
 
   // Listen for backend events
   useEffect(() => {
@@ -623,9 +1018,14 @@ export function App() {
       setSelectedIndex(0);
       setPreviewData(null);
       setMultiSelected(new Set());
+      setTableOpen(false);
+      setActivePanel("results");
+      setTableResults([]);
+      setTableMultiSelected(new Set());
     });
     const unlistenShown = listen("window-shown", async () => {
       invoke("refresh_apps");
+      applyAccentColor(); // Re-read config in case settings changed
       try {
         const frequent = await invoke<SearchResult[]>("get_frequent_items");
         if (frequent.length > 0) {
@@ -635,9 +1035,35 @@ export function App() {
         console.error("Frequent items error:", e);
       }
     });
+    const unlistenSettings = listen("open-settings", () => {
+      setShowSettings(true);
+    });
+    const unlistenSelect = listen("select-query", () => {
+      const input = document.querySelector(".omni-input") as HTMLInputElement | null;
+      if (input) {
+        input.focus();
+        input.select();
+      }
+      setActivePanel("results");
+    });
+
+    // Suppress Windows alt-menu mode: when Alt is pressed/released alone (or
+    // as part of Alt+Space), Windows enters menu-accelerator mode and dings on
+    // the next keystroke. Preventing default on Alt keydown cancels this.
+    const suppressAltMenu = (e: KeyboardEvent) => {
+      if (e.key === "Alt" || e.key === "Meta") {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener("keydown", suppressAltMenu, true);
+    window.addEventListener("keyup", suppressAltMenu, true);
     return () => {
       unlistenClear.then((fn) => fn());
       unlistenShown.then((fn) => fn());
+      unlistenSelect.then((fn) => fn());
+      unlistenSettings.then((fn) => fn());
+      window.removeEventListener("keydown", suppressAltMenu, true);
+      window.removeEventListener("keyup", suppressAltMenu, true);
     };
   }, []);
 
@@ -647,7 +1073,73 @@ export function App() {
   return (
     <div class="omni-container">
       <SearchInput value={query} onInput={handleInput} onKeyDown={handleKeyDown} />
-      {previewData ? (
+      {tableOpen ? (
+        <div class="omni-split">
+          <div class={`results-container ${activePanel === "results" ? "panel-active" : "panel-inactive"}`}>
+            {leftGrouped.map((group) => {
+              const startIndex = globalIndex;
+              globalIndex += group.results.length;
+              return (
+                <ResultGroup
+                  key={group.category}
+                  category={group.category}
+                  results={group.results}
+                  selectedIndex={activePanel === "results" ? selectedIndex : -1}
+                  globalStartIndex={startIndex}
+                  onExecute={executeResult}
+                  isActive={activePanel === "results" && group.category === activeCategory}
+                  isExpanded={group.category === expandedCategory}
+                  multiSelected={activePanel === "results" ? multiSelected : new Set()}
+                />
+              );
+            })}
+            {copiedFlash && <div class="copied-flash">Copied!</div>}
+          </div>
+          <div class="table-divider" />
+          <div class={activePanel === "table" ? "panel-active" : "panel-inactive"} style={{ display: "flex", flex: 1, minWidth: 0 }}>
+            {previewData ? (
+              <div class="results-container" style={{ flex: 1 }}>
+                <PreviewPanel preview={previewData} />
+              </div>
+            ) : contextMenuIndex === -2 && tableContextResult ? (
+              <div class="results-container" style={{ flex: 1 }}>
+                <ContextMenu
+                  result={tableContextResult}
+                  selectedAction={contextActionIndex}
+                  onExecute={(actionIndex: number) => {
+                    const actions = getActions(tableContextResult);
+                    if (actionIndex >= 0 && actionIndex < actions.length) {
+                      actions[actionIndex].handler();
+                    }
+                    setContextMenuIndex(null);
+                    setContextActionIndex(0);
+                    setTableContextResult(null);
+                  }}
+                />
+              </div>
+            ) : (
+              <TablePanel
+                results={tableResults}
+                selectedIndex={tableSelectedIndex}
+                multiSelected={tableMultiSelected}
+                onSelect={(i) => { setTableSelectedIndex(i); setActivePanel("table"); }}
+                onExecute={(i) => {
+                  const tr = tableResults[i];
+                  if (tr) {
+                    invoke("execute_action", { action: tr.action });
+                    invoke("record_selection", { query, resultPath: tr.subtitle, category: tr.category, title: tr.title });
+                  }
+                }}
+                sortColumn={tableSortColumn}
+                sortAscending={tableSortAscending}
+                columnOrder={columnOrder}
+                onSortChange={(col, asc) => { setTableSortColumn(col); setTableSortAscending(asc); fetchTableResults(query, col, asc); }}
+                onColumnReorder={saveColumnOrder}
+              />
+            )}
+          </div>
+        </div>
+      ) : previewData ? (
         <div class="results-container">
           <PreviewPanel preview={previewData} />
         </div>
@@ -688,7 +1180,7 @@ export function App() {
         </div>
       ) : flatResults.length > 0 ? (
         <div class="results-container">
-          {grouped.map((group) => {
+          {leftGrouped.map((group) => {
             const startIndex = globalIndex;
             globalIndex += group.results.length;
             return (
@@ -718,44 +1210,60 @@ export function App() {
               <div class="help-section-title">Navigation</div>
               <div class="help-row"><kbd>↑ ↓</kbd><span>Move between results</span></div>
               <div class="help-row"><kbd>Tab</kbd><span>Jump to next category</span></div>
-              <div class="help-row"><kbd>Ctrl+↑</kbd><span>Category start, then prev</span></div>
-              <div class="help-row"><kbd>Ctrl+↓</kbd><span>Category end, then next</span></div>
-              <div class="help-row"><kbd>Home</kbd><span>First result</span></div>
-              <div class="help-row"><kbd>End</kbd><span>Last result</span></div>
+              <div class="help-row"><kbd>Ctrl+↑ ↓</kbd><span>Category start/end, then jump</span></div>
+              <div class="help-row"><kbd>Home / End</kbd><span>First / last result</span></div>
               <div class="help-row"><kbd>PgUp/PgDn</kbd><span>Category bounds</span></div>
-              <div class="help-row"><kbd>Shift+↑↓</kbd><span>Multi-select items</span></div>
+              <div class="help-row"><kbd>Shift+↑ ↓</kbd><span>Multi-select items</span></div>
             </div>
             <div class="help-section">
               <div class="help-section-title">Actions</div>
               <div class="help-row"><kbd>Enter</kbd><span>Open / execute</span></div>
               <div class="help-row"><kbd>Shift+→</kbd><span>Context menu</span></div>
               <div class="help-row"><kbd>Shift+←</kbd><span>Close context menu</span></div>
-              <div class="help-row"><kbd>Ctrl+C</kbd><span>Copy path of selected result</span></div>
-              <div class="help-row"><kbd>Ctrl+E</kbd><span>Expand category (50 results)</span></div>
-              <div class="help-row"><kbd>Ctrl+Space</kbd><span>Preview file (↑↓ scroll, PgUp/Dn page)</span></div>
+              <div class="help-row"><kbd>Ctrl+C</kbd><span>Copy path</span></div>
+              <div class="help-row"><kbd>Ctrl+E</kbd><span>Expand category</span></div>
+              <div class="help-row"><kbd>Ctrl+Space</kbd><span>Preview file</span></div>
               <div class="help-row"><kbd>Escape</kbd><span>Collapse / hide</span></div>
               <div class="help-row"><kbd>Ctrl+H</kbd><span>Toggle this help</span></div>
+              <div class="help-row"><kbd>Ctrl+,</kbd><span>Settings</span></div>
             </div>
           </div>
-          <div class="help-section" style="margin-top: 10px;">
-            <div class="help-section-title">Search Syntax</div>
-            <div class="help-row"><kbd>C:\path\</kbd><span>Scope search to a directory</span></div>
-            <div class="help-row"><kbd>F:\docs\report</kbd><span>Search "report" in F:\docs\</span></div>
-            <div class="help-row"><kbd>*.rs</kbd><span>Wildcard extension match</span></div>
-            <div class="help-row"><kbd>foo | bar</kbd><span>OR — match either term</span></div>
-            <div class="help-row"><kbd>!node_modules</kbd><span>NOT — exclude term</span></div>
-            <div class="help-row"><kbd>foo bar</kbd><span>Fuzzy fragments (matches *foo*bar*)</span></div>
-            <div class="help-row"><kbd>regex:pattern</kbd><span>Regex search (also r:)</span></div>
+          <div class="help-grid" style="margin-top: 10px;">
+            <div class="help-section">
+              <div class="help-section-title">File Browser</div>
+              <div class="help-row"><kbd>Ctrl+T</kbd><span>Toggle file browser panel</span></div>
+              <div class="help-row"><kbd>Ctrl+→</kbd><span>Jump to file browser</span></div>
+              <div class="help-row"><kbd>Ctrl+←</kbd><span>Jump back to results</span></div>
+              <div class="help-row"><kbd>Ctrl+Tab</kbd><span>Switch panels</span></div>
+              <div class="help-row"><kbd>Ctrl+↑ ↓</kbd><span>Page jump in table</span></div>
+              <div class="help-row"><kbd>Ctrl+1-5</kbd><span>Sort by column (toggles direction)</span></div>
+              <div class="help-row"><kbd>Ctrl+Shift+←→</kbd><span>Reorder columns</span></div>
+              <div class="help-row"><kbd>Drag header</kbd><span>Reorder columns (mouse)</span></div>
+            </div>
+            <div class="help-section">
+              <div class="help-section-title">Search Syntax</div>
+              <div class="help-row"><kbd>C:\path\</kbd><span>Scope to directory</span></div>
+              <div class="help-row"><kbd>*.rs</kbd><span>Wildcard extension</span></div>
+              <div class="help-row"><kbd>foo | bar</kbd><span>OR - match either</span></div>
+              <div class="help-row"><kbd>!node_modules</kbd><span>NOT - exclude term</span></div>
+              <div class="help-row"><kbd>foo bar</kbd><span>Fuzzy fragments</span></div>
+              <div class="help-row"><kbd>regex:pattern</kbd><span>Regex search (also r:)</span></div>
+            </div>
           </div>
         </div>
       )}
       {flatResults.length > 0 && !showHelp && !previewData && contextMenuIndex === null && (
         <div class="status-bar">
-          {multiSelected.size > 0
-            ? `${multiSelected.size + 1} items selected \u00b7 Shift+\u2192 for batch actions`
-            : flatResults[selectedIndex]?.subtitle || ""}
+          {tableOpen && activePanel === "table"
+            ? (tableMultiSelected.size > 0
+                ? `${tableMultiSelected.size + 1} items selected - Shift+\u2192 for batch actions`
+                : tableResults[tableSelectedIndex]?.subtitle || "")
+            : multiSelected.size > 0
+              ? `${multiSelected.size + 1} items selected - Shift+\u2192 for batch actions`
+              : flatResults[selectedIndex]?.subtitle || ""}
         </div>
       )}
+      <SettingsPanel visible={showSettings} onDismiss={() => setShowSettings(false)} />
     </div>
   );
 }

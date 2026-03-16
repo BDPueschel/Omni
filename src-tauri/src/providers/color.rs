@@ -76,6 +76,8 @@ impl ColorProvider {
                 subtitle,
                 action: ResultAction::Copy { text: hex6.clone() },
                 icon: format!("color:{}", hex6),
+                size: None,
+                date_modified: None,
             }]
         } else {
             vec![]

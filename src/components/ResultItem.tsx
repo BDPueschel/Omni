@@ -24,20 +24,23 @@ export function ResultItem({ result, isSelected, isMultiSelected, onExecute }: P
   const [iconUri, setIconUri] = useState<string | null>(null);
 
   useEffect(() => {
-    if (result.icon === "app" && result.subtitle) {
-      const cached = iconCache.get(result.subtitle);
+    if (result.icon === "app") {
+      // Extract path from action (works for both regular and frequent items)
+      const path = result.action?.path || result.subtitle;
+      if (!path) return;
+      const cached = iconCache.get(path);
       if (cached) {
         setIconUri(cached);
       } else {
-        invoke<string>("get_icon", { path: result.subtitle }).then((uri) => {
+        invoke<string>("get_icon", { path }).then((uri) => {
           if (uri) {
-            iconCache.set(result.subtitle, uri);
+            iconCache.set(path, uri);
             setIconUri(uri);
           }
         });
       }
     }
-  }, [result.subtitle, result.icon]);
+  }, [result.action, result.icon]);
 
   const isColorSwatch = result.icon.startsWith("color:");
   const colorHex = isColorSwatch ? result.icon.slice(6) : null;

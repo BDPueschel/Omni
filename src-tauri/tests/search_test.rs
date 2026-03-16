@@ -53,3 +53,16 @@ fn test_unknown_system_command() {
     let result = omni_lib::search::execute_system_command_dry("nonexistent");
     assert!(result.is_err());
 }
+
+#[test]
+#[ignore] // Requires Everything 1.5a to be running
+fn test_search_table_query_returns_only_files_and_dirs() {
+    let results = omni_lib::search::search_table_query("test", 100, "date_modified", false);
+    for r in &results {
+        assert!(
+            r.category == "Files" || r.category == "Directories",
+            "Unexpected category: {}",
+            r.category
+        );
+    }
+}

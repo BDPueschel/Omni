@@ -18,10 +18,14 @@ pub fn get_icon(path: String) -> String {
         }
     }
 
-    let result = extract_icon(&path).unwrap_or_default();
+    // SHGetFileInfoW returns blank icons on MTA threads.
+    // Spawn a dedicated STA thread to do the extraction.
+    let path_clone = path.clone();
+    let handle = std::thread::spawn(move || extract_icon(&path_clone));
+    let result = handle.join().ok().flatten().unwrap_or_default();
 
-    // Cache the result
-    {
+    // Only cache successful results — failed extractions may succeed on retry
+    if !result.is_empty() {
         let mut cache = get_cache().lock().unwrap();
         cache.insert(path, result.clone());
     }
@@ -35,8 +39,16 @@ fn extract_icon(path: &str) -> Option<String> {
         CreateCompatibleDC, DeleteDC, DeleteObject, GetDIBits, GetObjectW, SelectObject, BITMAP,
         BITMAPINFO, BITMAPINFOHEADER, DIB_RGB_COLORS, RGBQUAD,
     };
-    use windows::Win32::UI::Shell::{SHGetFileInfoW, SHFILEINFOW, SHGFI_ICON, SHGFI_LARGEICON};
+    use windows::Win32::UI::Shell::{SHGetFileInfoW, SHFILEINFOW, SHGFI_ICON, SHGFI_LARGEICON, SHGFI_USEFILEATTRIBUTES};
     use windows::Win32::UI::WindowsAndMessaging::{DestroyIcon, GetIconInfo, ICONINFO};
+
+    // SHGetFileInfoW requires COM initialized as STA — MTA threads get blank icons
+    unsafe {
+        let _ = windows::Win32::System::Com::CoInitializeEx(
+            None,
+            windows::Win32::System::Com::COINIT_APARTMENTTHREADED,
+        );
+    }
 
     let wide_path: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
 
@@ -52,7 +64,20 @@ fn extract_icon(path: &str) -> Option<String> {
     };
 
     if result == 0 || shfi.hIcon.is_invalid() {
-        return None;
+        // Fallback: use file attributes (doesn't need file access, gives generic icon by type)
+        shfi = SHFILEINFOW::default();
+        let fallback = unsafe {
+            SHGetFileInfoW(
+                PCWSTR(wide_path.as_ptr()),
+                windows::Win32::Storage::FileSystem::FILE_ATTRIBUTE_NORMAL,
+                Some(&mut shfi),
+                std::mem::size_of::<SHFILEINFOW>() as u32,
+                SHGFI_ICON | SHGFI_LARGEICON | SHGFI_USEFILEATTRIBUTES,
+            )
+        };
+        if fallback == 0 || shfi.hIcon.is_invalid() {
+            return None;
+        }
     }
 
     let icon = shfi.hIcon;

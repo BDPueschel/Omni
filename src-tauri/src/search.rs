@@ -54,6 +54,8 @@ pub fn search_query(
                     text: entry.content,
                 },
                 icon: "clipboard".to_string(),
+                size: None,
+                date_modified: None,
             });
         }
         return all_results;
@@ -138,6 +140,51 @@ pub fn search_query(
     all_results
 }
 
+/// Table panel search — files and directories only, with metadata, sortable.
+pub fn search_table_query(
+    query: &str,
+    max: usize,
+    sort_by: &str,
+    ascending: bool,
+) -> Vec<SearchResult> {
+    let query = query.trim();
+    if query.is_empty() {
+        return vec![];
+    }
+
+    // Map frontend sort names to Everything HTTP API sort values.
+    let sort = match sort_by {
+        "name" => "name",
+        "type" => "extension",
+        "path" => "path",
+        "size" => "size",
+        "date_modified" => "date_modified",
+        _ => "date_modified",
+    };
+
+    let http_query = EverythingProvider::build_http_query(query);
+    match EverythingProvider::query_http_public(&http_query, max, sort, ascending) {
+        Ok(results) => results,
+        Err(e) => {
+            eprintln!("search_table HTTP error: {}", e);
+            // Fallback: use regular search, filter to files/dirs
+            let (files, dirs) = EverythingProvider::search_all(query, max / 2);
+            let mut combined = files;
+            combined.extend(dirs);
+            combined
+        }
+    }
+}
+
+#[tauri::command]
+pub fn search_table(
+    query: &str,
+    sort_by: &str,
+    ascending: bool,
+) -> Vec<SearchResult> {
+    search_table_query(query, 1000, sort_by, ascending)
+}
+
 #[tauri::command]
 pub fn search(query: &str, state: State<AppState>) -> Vec<SearchResult> {
     let config = state.config.lock().unwrap().clone();
@@ -193,6 +240,8 @@ pub fn expand_category(query: &str, category: &str, state: State<AppState>) -> V
                         subtitle: format!("{}{}", pin_prefix, entry.timestamp),
                         action: ResultAction::Copy { text: entry.content },
                         icon: "clipboard".to_string(),
+                        size: None,
+                        date_modified: None,
                     }
                 })
                 .collect()
@@ -439,6 +488,8 @@ pub fn get_frequent_items() -> Vec<SearchResult> {
                 } else {
                     "file".to_string()
                 },
+                size: None,
+                date_modified: None,
             }
         })
         .collect()
@@ -500,6 +551,45 @@ pub fn batch_delete(paths: Vec<String>) -> Result<(), String> {
         std::process::Command::new("powershell").args(["-Command", &ps_cmd]).spawn().map_err(|e| e.to_string())?;
     }
     Ok(())
+}
+
+#[tauri::command]
+pub fn get_system_accent() -> (u8, u8, u8) {
+    // Read Windows accent color from registry
+    use windows::core::PCWSTR;
+    use windows::Win32::System::Registry::{
+        RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_DWORD,
+    };
+
+    let subkey: Vec<u16> = "SOFTWARE\\Microsoft\\Windows\\DWM\0"
+        .encode_utf16()
+        .collect();
+    let value: Vec<u16> = "AccentColor\0".encode_utf16().collect();
+    let mut data: u32 = 0;
+    let mut size: u32 = 4;
+
+    let result = unsafe {
+        RegGetValueW(
+            HKEY_CURRENT_USER,
+            PCWSTR(subkey.as_ptr()),
+            PCWSTR(value.as_ptr()),
+            RRF_RT_REG_DWORD,
+            None,
+            Some(&mut data as *mut u32 as *mut _),
+            Some(&mut size),
+        )
+    };
+
+    if result.is_ok() {
+        // AccentColor is ABGR format
+        let r = (data & 0xFF) as u8;
+        let g = ((data >> 8) & 0xFF) as u8;
+        let b = ((data >> 16) & 0xFF) as u8;
+        (r, g, b)
+    } else {
+        // Fallback to default blue
+        (130, 180, 255)
+    }
 }
 
 /// Dry-run version for testing — validates the command name without executing.

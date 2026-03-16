@@ -96,6 +96,8 @@ impl AppProvider {
                         path: app.path.clone(),
                     },
                     icon: "app".to_string(),
+                    size: None,
+                    date_modified: None,
                 }
             })
             .collect()
